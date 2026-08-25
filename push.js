@@ -1,35 +1,55 @@
 /* ==========================================================
-   SISTEMA · envío de avisos
-   Lo ejecuta GitHub Actions. El turno se decide aquí,
-   a partir de TURNO_MANUAL o de la hora del cron.
+   SISTEMA · avisos
+   ==========================================================
+   PARA AÑADIR, QUITAR O CAMBIAR UN AVISO, EDITA SOLO LA LISTA
+   DE AQUÍ ABAJO. No hace falta tocar ningún otro archivo.
+
+   Formato de cada línea:
+       hora: 'texto del aviso',
+
+   La hora es en hora de Ecuador, de 0 a 23, sin minutos.
+   Ejemplos:  6 = 6 de la mañana   14 = 2 de la tarde   21 = 9 de la noche
+
+   Para AÑADIR un aviso: copia una línea y cámbiale la hora y el texto.
+   Para QUITAR un aviso: borra su línea entera.
+   Para CAMBIAR la hora: cambia el número del principio.
+   Para CAMBIAR el texto: cambia lo que va entre comillas.
+
+   Cuidado: cada línea acaba en coma, menos la última.
+   Si el texto lleva un apóstrofo, escríbelo así: \'
    ========================================================== */
-const webpush = require('web-push');
 
 const AVISOS = {
-  manana: 'Es un nuevo día. Tus misiones diarias están disponibles de nuevo.',
-  tarde:  'La mitad del día se ha ido. Revisa qué te falta.',
-  noche:  'Recuerda marcar las diarias del día de hoy.'
+  6:  'Es un nuevo día. Tus misiones diarias están disponibles de nuevo.',
+  14: 'La mitad del día se ha ido. Revisa qué te falta.',
+  21: 'Recuerda marcar las diarias del día de hoy.'
 };
 
-const CRONES = {
-  '30 11 * * *': 'manana',
-  '0 19 * * *':  'tarde',
-  '0 2 * * *':   'noche'
-};
+/* ==========================================================
+   De aquí para abajo no hace falta tocar nada.
+   ========================================================== */
+// Hora de Ecuador (UTC-5, sin cambios de horario)
+const ahora = new Date();
+const horaEc = (ahora.getUTCHours() + 24 - 5) % 24;
 
-const turno = AVISOS[process.env.TURNO_MANUAL]
-  ? process.env.TURNO_MANUAL
-  : (CRONES[process.env.CRON] || 'noche');
+// Si se lanza a mano se puede forzar una hora concreta
+const forzada = (process.env.HORA_MANUAL || '').trim();
+const hora = forzada !== '' ? parseInt(forzada, 10) : horaEc;
+
+console.log('Hora en Ecuador: ' + horaEc + ':00' + (forzada !== '' ? '  ·  forzada a las ' + hora : ''));
+
+const texto = AVISOS[hora];
+if (!texto) {
+  console.log('No hay ningún aviso para esta hora. Nada que enviar.');
+  process.exit(0);
+}
+console.log('Aviso: ' + texto);
+
+const webpush = require('web-push');
 
 const PUB  = (process.env.VAPID_PUBLIC  || '').trim();
 const PRIV = (process.env.VAPID_PRIVATE || '').trim();
 const SUB  = (process.env.PUSH_SUB      || '').trim();
-
-// --- diagnóstico: dice qué falta sin enseñar el contenido ---
-console.log('Turno: ' + turno);
-console.log('VAPID_PUBLIC:  ' + (PUB  ? PUB.length + ' caracteres'  : 'VACÍO O NO EXISTE'));
-console.log('VAPID_PRIVATE: ' + (PRIV ? PRIV.length + ' caracteres' : 'VACÍO O NO EXISTE'));
-console.log('PUSH_SUB:      ' + (SUB  ? SUB.length + ' caracteres'  : 'VACÍO O NO EXISTE'));
 
 const fallos = [];
 if (!PUB)  fallos.push('Falta el secreto VAPID_PUBLIC.');
@@ -46,7 +66,6 @@ if (SUB) {
     try {
       sub = JSON.parse(SUB);
       if (!sub.endpoint) fallos.push('PUSH_SUB no tiene endpoint.');
-      else console.log('Destino: ' + sub.endpoint.slice(0, 42) + '...');
       if (!sub.keys || !sub.keys.p256dh || !sub.keys.auth) fallos.push('PUSH_SUB no trae las dos claves.');
     } catch (e) {
       fallos.push('PUSH_SUB no es un JSON válido: ' + e.message);
@@ -60,26 +79,21 @@ if (fallos.length) {
   process.exit(1);
 }
 
-// Apple valida este campo: tiene que ser un mailto con dominio real
-// o una URL https. Se puede cambiar con el secreto VAPID_SUB.
+// Apple valida el remitente: mailto con dominio real o URL https
 const SUBJ = (process.env.VAPID_SUB || '').trim() || 'mailto:sistema@sistema.app';
-console.log('Remitente: ' + SUBJ);
 webpush.setVapidDetails(SUBJ, PUB, PRIV);
 
 webpush.sendNotification(sub, JSON.stringify({
   title: 'Sistema',
-  body: AVISOS[turno],
-  tag: 'sistema-' + turno
+  body: texto,
+  tag: 'sistema-' + hora
 }))
-  .then(() => console.log('\nEnviado correctamente (' + turno + ')'))
+  .then(() => console.log('\nEnviado correctamente.'))
   .catch(err => {
     console.error('\n--- FALLO AL ENVIAR ---');
     console.error('Código: ' + (err.statusCode !== undefined ? err.statusCode : 'sin código'));
     console.error('Respuesta: ' + (err.body || err.message || err));
-    if (err.statusCode === 403) {
-      console.error('Apple rechazó la firma. Puede ser que las claves VAPID no coincidan');
-      console.error('con las que usó el teléfono, o que el remitente no le valga.');
-    }
+    if (err.statusCode === 403) console.error('Apple rechazó la firma: revisa las claves VAPID.');
     if (err.statusCode === 410 || err.statusCode === 404)
       console.error('La suscripción caducó: vuelve a activar las notificaciones y actualiza PUSH_SUB.');
     if (err.statusCode === 400) console.error('La suscripción está mal formada o incompleta.');
