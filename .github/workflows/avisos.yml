@@ -25,6 +25,7 @@ jobs:
           VAPID_PUBLIC: ${{ secrets.VAPID_PUBLIC }}
           VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}
           PUSH_SUB: ${{ secrets.PUSH_SUB }}
+          VAPID_SUB: ${{ secrets.VAPID_SUB }}
           TURNO_MANUAL: ${{ github.event.inputs.turno }}
           CRON: ${{ github.event.schedule }}
         run: node push.js
