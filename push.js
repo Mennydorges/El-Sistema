@@ -83,9 +83,10 @@ if (fallos.length) {
 const SUBJ = (process.env.VAPID_SUB || '').trim() || 'mailto:sistema@sistema.app';
 webpush.setVapidDetails(SUBJ, PUB, PRIV);
 
+// El texto va como título: iOS ya añade "from Sistema" debajo,
+// así que repetirlo como título sería redundante.
 webpush.sendNotification(sub, JSON.stringify({
-  title: 'Sistema',
-  body: texto,
+  title: texto,
   tag: 'sistema-' + hora
 }))
   .then(() => console.log('\nEnviado correctamente.'))
