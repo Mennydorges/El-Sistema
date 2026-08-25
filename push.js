@@ -5,24 +5,27 @@
    DE AQUÍ ABAJO. No hace falta tocar ningún otro archivo.
 
    Formato de cada línea:
-       hora: 'texto del aviso',
+       hora: ['Título corto', 'Texto completo del aviso'],
 
    La hora es en hora de Ecuador, de 0 a 23, sin minutos.
    Ejemplos:  6 = 6 de la mañana   14 = 2 de la tarde   21 = 9 de la noche
 
-   Para AÑADIR un aviso: copia una línea y cámbiale la hora y el texto.
+   El TÍTULO sale en negrita y es UNA SOLA LÍNEA: si es largo se corta.
+   Déjalo en tres o cuatro palabras.
+   El TEXTO sale debajo, admite varias líneas y no se corta.
+
+   Para AÑADIR un aviso: copia una línea y cámbiale la hora y los textos.
    Para QUITAR un aviso: borra su línea entera.
    Para CAMBIAR la hora: cambia el número del principio.
-   Para CAMBIAR el texto: cambia lo que va entre comillas.
 
    Cuidado: cada línea acaba en coma, menos la última.
-   Si el texto lleva un apóstrofo, escríbelo así: \'
+   Si un texto lleva un apóstrofo, escríbelo así: \'
    ========================================================== */
 
 const AVISOS = {
-  6:  'Es un nuevo día. Tus misiones diarias están disponibles de nuevo.',
-  14: 'La mitad del día se ha ido. Revisa qué te falta.',
-  21: 'Recuerda marcar las diarias del día de hoy.'
+  6:  ['Un nuevo día',      'Tus misiones diarias están disponibles de nuevo.'],
+  14: ['Mitad del día',     'Revisa qué te falta por completar.'],
+  21: ['Cierre del día',    'Recuerda marcar las diarias de hoy.']
 };
 
 /* ==========================================================
@@ -38,12 +41,16 @@ const hora = forzada !== '' ? parseInt(forzada, 10) : horaEc;
 
 console.log('Hora en Ecuador: ' + horaEc + ':00' + (forzada !== '' ? '  ·  forzada a las ' + hora : ''));
 
-const texto = AVISOS[hora];
-if (!texto) {
+const aviso = AVISOS[hora];
+if (!aviso) {
   console.log('No hay ningún aviso para esta hora. Nada que enviar.');
   process.exit(0);
 }
-console.log('Aviso: ' + texto);
+// Admite ['título','texto'] o un texto suelto
+const titulo = Array.isArray(aviso) ? aviso[0] : 'Sistema';
+const texto  = Array.isArray(aviso) ? (aviso[1] || '') : aviso;
+console.log('Título: ' + titulo);
+console.log('Texto:  ' + texto);
 
 const webpush = require('web-push');
 
@@ -83,10 +90,9 @@ if (fallos.length) {
 const SUBJ = (process.env.VAPID_SUB || '').trim() || 'mailto:sistema@sistema.app';
 webpush.setVapidDetails(SUBJ, PUB, PRIV);
 
-// El texto va como título: iOS ya añade "from Sistema" debajo,
-// así que repetirlo como título sería redundante.
 webpush.sendNotification(sub, JSON.stringify({
-  title: texto,
+  title: titulo,
+  body: texto,
   tag: 'sistema-' + hora
 }))
   .then(() => console.log('\nEnviado correctamente.'))
