@@ -28,6 +28,12 @@
   --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+/* cifras de ancho fijo en toda la app: al cambiar un número nada se recoloca */
+body,input,select,textarea,button{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+/* ninguna cifra ni etiqueta corta parte en dos líneas empujando lo que tiene al lado */
+.at span,.at b,.umb div span,.umb div b,.esqfila span,.sem b,.catcab b,.aj span.val,
+.dosmetas>div>span,.dosmetas b,.metabox span,.metabox b,.anillo-kcal .big,.anillo-kcal .sub,
+.item .kc,.nivel b,.nivel span{white-space:nowrap}
 html{-webkit-text-size-adjust:100%;touch-action:manipulation}
 html,body{margin:0;padding:0;overscroll-behavior:none}
 body{
@@ -97,8 +103,8 @@ body{
 /* ---------- atributos ---------- */
 .atwrap{display:flex;gap:12px;align-items:center}
 .atgrid{display:grid;grid-template-columns:1fr 1fr;gap:7px 14px;flex:1}
-.at{display:flex;justify-content:space-between;align-items:baseline;
-  border-bottom:1px solid rgba(77,184,255,.13);padding-bottom:4px}
+.at{display:flex;justify-content:space-between;align-items:baseline;gap:6px;min-width:0;
+  border-bottom:1px solid rgba(77,184,255,.13);padding-bottom:4px;min-height:26px}
 .at{cursor:pointer}
 .at span{font-size:12.5px;letter-spacing:.16em;color:var(--azul-claro);font-weight:600}
 .at b{font-family:var(--mono);font-size:16px;color:#fff;font-weight:500}
@@ -116,7 +122,9 @@ body{
 .esq em{color:var(--gris);font-style:normal}
 
 .umb{display:grid;grid-template-columns:1fr 1fr;gap:5px 14px}
-.umb div{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;color:var(--tenue)}
+.umb div{display:flex;justify-content:space-between;gap:6px;font-family:var(--mono);font-size:12px;
+  color:var(--tenue);min-width:0}
+.umb div span{overflow:hidden;text-overflow:ellipsis}
 .umb b{color:var(--azul-claro);font-weight:500}
 
 /* ---------- misiones ---------- */
@@ -158,7 +166,7 @@ body{
 .sub input:checked{background:rgba(56,240,255,.22)}
 .sub input:checked::after{content:'✓';font-size:11px;color:var(--cian)}
 .sem.exc2 span,.sem.exc2 b{color:var(--morado-luz)}
-.sem{display:flex;justify-content:space-between;align-items:center;padding:9px 0;
+.sem{display:flex;justify-content:space-between;align-items:center;gap:8px;min-width:0;padding:9px 0;
   border-bottom:1px solid rgba(77,184,255,.12);font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--azul-claro)}
 .sem b{font-family:var(--mono);font-size:12.5px;color:var(--tenue);letter-spacing:0;text-transform:none}
 .sem.done b{color:var(--cian)}
@@ -331,12 +339,10 @@ button.lapiz.inerte{color:var(--gris);cursor:not-allowed}
 /* ---- nutrición ---- */
 .sub-restantes{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;
   color:var(--tenue);text-align:center;margin:0 0 8px}
-/* cifras de ancho fijo: al cambiar un número nada se recoloca */
-.dosmetas b,.metabox b,.macro b,.par .det,.sem b,.anillo-kcal .big,.big,.kc,.aj span.val{
-  font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
 .metabox{text-align:center;margin-top:12px;min-height:44px}
-.dosmetas{display:flex;gap:10px}
-.dosmetas>div{flex:1}
+.dosmetas{display:flex;gap:10px;align-items:flex-start}
+.dosmetas>div{flex:1 1 0;min-width:0;display:flex;flex-direction:column}
+.dosmetas>div>span{overflow:hidden;text-overflow:ellipsis}
 .dosmetas>div>span{display:block;font-size:11px;letter-spacing:.14em}
 .dosmetas b{display:block;font-family:var(--mono);font-size:15px;color:var(--azul-claro);margin-top:3px}
 .dosmetas i{font-style:normal;font-size:10px;color:#ffb547}
@@ -349,17 +355,20 @@ button.lapiz.inerte{color:var(--gris);cursor:not-allowed}
 .kcalwrap{display:flex;justify-content:center;align-items:center;position:relative}
 .kcalwrap .centro{position:absolute;inset:0;display:flex;flex-direction:column;
   align-items:center;justify-content:center;gap:1px}
-.macros{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px}
-.macro{text-align:center}
-.macro b{display:block;font-family:var(--mono);font-size:13px;color:#fff}
-.macro span{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--tenue)}
-.macro .bar{height:5px;background:rgba(77,184,255,.12);border:1px solid var(--linea);margin-top:5px;
+/* tres columnas iguales: la barra siempre a la misma altura en las tres */
+.macros{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px;align-items:stretch}
+.macro{text-align:center;display:flex;flex-direction:column;min-width:0}
+.macro b{display:block;font-family:var(--mono);font-size:12px;color:#fff;white-space:nowrap;
+  line-height:1.3}
+.macro span{font-family:var(--mono);font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--tenue);white-space:nowrap;line-height:1.3}
+.macro .barwrap{margin-top:auto;padding-top:6px}
+.macro .bar{height:5px;background:rgba(77,184,255,.12);border:1px solid var(--linea);
   overflow:hidden;box-sizing:content-box}
-.macro{min-height:46px}
 .macro .bar i{display:block;height:100%;background:var(--azul)}
 .macro.pasado .bar i{background:var(--rojo)}
 .macro.rango .bar i{background:var(--morado-luz)}
-.catcab{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.catcab{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;min-height:20px}
 .catcab h4{font-size:12.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--azul-claro);margin:0;font-weight:600}
 .catcab b{font-family:var(--mono);font-size:12px;color:var(--tenue)}
 .item{display:flex;justify-content:space-between;align-items:center;padding:8px 0;
@@ -2350,7 +2359,8 @@ function pintarComida(){
     const enRango=id!=="prot"&&v>=m/2&&v<=m, pasado=v>m;
     return '<div class="macro'+(pasado?' pasado':(enRango?' rango':''))+'">'+
       '<span>'+n+'</span><b>'+Math.round(v)+' / '+Math.round(m)+' g</b>'+
-      '<div class="bar"><i style="width:'+Math.min(100,m>0?v/m*100:0)+'%"></i></div></div>';
+      '<div class="barwrap"><div class="bar"><i style="width:'+
+        Math.min(100,m>0?v/m*100:0)+'%"></i></div></div></div>';
   }).join('');
 
   const ps=paramsComida(hoy), n=ps.filter(p=>p.ok).length;
@@ -2579,7 +2589,9 @@ function hojaDia(clave){
     for(const[k,nomC]of CATS){
       const its=cs.filter(x=>x.cat===k).sort((a,b)=>a.h<b.h?-1:1);
       if(!its.length)continue;
-      cuerpo+='<p class="nota" style="margin:10px 0 4px">'+nomC+'</p>'+
+      const kc2=Math.round(its.reduce((a,x)=>a+(x.kcal||0),0));
+      cuerpo+='<p class="nota" style="margin:10px 0 4px;display:flex;justify-content:space-between;'+
+        'gap:8px"><span>'+nomC+'</span><span>'+kc2+' kcal</span></p>'+
         its.map(x=>'<div class="item"><span>'+x.nom+
           '<small>'+x.h+' · '+(x.porc>0?txtPorc(x.porc):Math.round(x.g)+' '+(x.u||'g'))+
           ' · P '+g1(x.prot)+' C '+g1(x.carb)+' G '+g1(x.gras)+'</small></span>'+
@@ -3747,6 +3759,19 @@ function pintarAvisos(){
   n.textContent=e==='activo'?'activas':e==='no'?'no disponible':
     e==='bloqueado'?'bloqueadas':'apagadas';
 }
+function copiarClave(el,btn){
+  const t=el.querySelector('#av-tx'); if(!t)return;
+  const ok=()=>{if(btn)btn.textContent='Copiado'; sfx('click')};
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(t.value).then(ok).catch(()=>{
+      t.focus(); t.setSelectionRange(0,t.value.length);
+      try{document.execCommand('copy'); ok()}catch(e){}
+    });
+  }else{
+    t.focus(); t.setSelectionRange(0,t.value.length);
+    try{document.execCommand('copy'); ok()}catch(e){}
+  }
+}
 function hojaAvisos(){
   const e=estadoAvisos();
   let cuerpo='';
@@ -3787,10 +3812,12 @@ function hojaAvisos(){
         '<textarea readonly rows="6" id="av-tx" style="width:100%;background:rgba(4,10,20,.85);'+
         'border:1px solid var(--linea);color:var(--texto);font-family:var(--mono);font-size:10px;'+
         'padding:10px;word-break:break-all">'+D.pushSub+'</textarea>'+
-        '<div class="pbtns"><button class="btn" data-cp2>Copiar</button></div>');
+        '<div class="pbtns"><button class="btn" data-cp2>Copiar</button>'+
+        (navigator.share?'<button class="btn" data-sh>Compartir</button>':'')+'</div>');
       const b2=el.querySelector('[data-cp2]');
-      if(b2)b2.onclick=()=>{const t=el.querySelector('#av-tx');t.select();
-        document.execCommand('copy'); b2.textContent='Copiado'; sfx('click')};
+      if(b2)b2.onclick=()=>copiarClave(el,b2);
+      const b3=el.querySelector('[data-sh]');
+      if(b3)b3.onclick=()=>navigator.share({title:'Clave del Sistema',text:D.pushSub}).catch(()=>{});
     }catch(err){
       out('<p class="nota" style="color:var(--rojo)">No se pudo activar: '+(err&&err.message||err)+'</p>');
     }
@@ -3800,9 +3827,11 @@ function hojaAvisos(){
     out('<p class="eyebrow" style="margin-top:16px">Clave de este teléfono</p>'+
       '<textarea readonly rows="6" id="av-tx" style="width:100%;background:rgba(4,10,20,.85);'+
       'border:1px solid var(--linea);color:var(--texto);font-family:var(--mono);font-size:10px;'+
-      'padding:10px;word-break:break-all">'+(D.pushSub||'')+'</textarea>');
-    const t=el.querySelector('#av-tx'); t.select(); document.execCommand('copy');
-    bcp.textContent='Copiado'; sfx('click');
+      'padding:10px;word-break:break-all">'+(D.pushSub||'')+'</textarea>'+
+      (navigator.share?'<div class="pbtns"><button class="btn" data-sh2>Compartir</button></div>':''));
+    copiarClave(el,bcp);
+    const b4=el.querySelector('[data-sh2]');
+    if(b4)b4.onclick=()=>navigator.share({title:'Clave del Sistema',text:D.pushSub}).catch(()=>{});
   };
 }
 
