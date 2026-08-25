@@ -2,15 +2,13 @@ name: Avisos del Sistema
 
 "on":
   schedule:
-    - cron: "30 11 * * *"
-    - cron: "0 19 * * *"
-    - cron: "0 2 * * *"
+    - cron: "0 * * * *"
   workflow_dispatch:
     inputs:
-      turno:
-        description: "manana, tarde o noche"
-        required: true
-        default: "manana"
+      hora:
+        description: "Hora de Ecuador a probar (0-23). Vacío = la hora actual."
+        required: false
+        default: ""
 
 jobs:
   enviar:
@@ -26,6 +24,5 @@ jobs:
           VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}
           PUSH_SUB: ${{ secrets.PUSH_SUB }}
           VAPID_SUB: ${{ secrets.VAPID_SUB }}
-          TURNO_MANUAL: ${{ github.event.inputs.turno }}
-          CRON: ${{ github.event.schedule }}
+          HORA_MANUAL: ${{ github.event.inputs.hora }}
         run: node push.js
