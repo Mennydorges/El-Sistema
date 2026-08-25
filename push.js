@@ -60,7 +60,11 @@ if (fallos.length) {
   process.exit(1);
 }
 
-webpush.setVapidDetails('mailto:sistema@localhost', PUB, PRIV);
+// Apple valida este campo: tiene que ser un mailto con dominio real
+// o una URL https. Se puede cambiar con el secreto VAPID_SUB.
+const SUBJ = (process.env.VAPID_SUB || '').trim() || 'mailto:sistema@sistema.app';
+console.log('Remitente: ' + SUBJ);
+webpush.setVapidDetails(SUBJ, PUB, PRIV);
 
 webpush.sendNotification(sub, JSON.stringify({
   title: 'Sistema',
@@ -72,7 +76,10 @@ webpush.sendNotification(sub, JSON.stringify({
     console.error('\n--- FALLO AL ENVIAR ---');
     console.error('Código: ' + (err.statusCode !== undefined ? err.statusCode : 'sin código'));
     console.error('Respuesta: ' + (err.body || err.message || err));
-    if (err.statusCode === 403) console.error('Las claves VAPID no coinciden con las que usó el teléfono.');
+    if (err.statusCode === 403) {
+      console.error('Apple rechazó la firma. Puede ser que las claves VAPID no coincidan');
+      console.error('con las que usó el teléfono, o que el remitente no le valga.');
+    }
     if (err.statusCode === 410 || err.statusCode === 404)
       console.error('La suscripción caducó: vuelve a activar las notificaciones y actualiza PUSH_SUB.');
     if (err.statusCode === 400) console.error('La suscripción está mal formada o incompleta.');
