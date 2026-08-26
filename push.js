@@ -41,11 +41,19 @@ const hora = forzada !== '' ? parseInt(forzada, 10) : horaEc;
 
 console.log('Hora en Ecuador: ' + horaEc + ':00' + (forzada !== '' ? '  ·  forzada a las ' + hora : ''));
 
-const aviso = AVISOS[hora];
+// GitHub se retrasa: un aviso de las 6 puede ejecutarse a las 7.
+// Por eso cada aviso vale para su hora y la siguiente. La etiqueta es
+// la misma, así que si se repitiera, la segunda sustituye a la primera.
+let hAviso = null;
+if (AVISOS[hora]) hAviso = hora;
+else if (AVISOS[(hora + 23) % 24]) hAviso = (hora + 23) % 24;
+
+const aviso = hAviso !== null ? AVISOS[hAviso] : null;
 if (!aviso) {
   console.log('No hay ningún aviso para esta hora. Nada que enviar.');
   process.exit(0);
 }
+if (hAviso !== hora) console.log('Recuperando el aviso de las ' + hAviso + ':00 (llegó tarde).');
 // Admite ['título','texto'] o un texto suelto
 const titulo = Array.isArray(aviso) ? aviso[0] : 'Sistema';
 const texto  = Array.isArray(aviso) ? (aviso[1] || '') : aviso;
@@ -93,7 +101,7 @@ webpush.setVapidDetails(SUBJ, PUB, PRIV);
 webpush.sendNotification(sub, JSON.stringify({
   title: titulo,
   body: texto,
-  tag: 'sistema-' + hora
+  tag: 'sistema-' + hAviso
 }))
   .then(() => console.log('\nEnviado correctamente.'))
   .catch(err => {

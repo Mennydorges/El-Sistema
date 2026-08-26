@@ -1,13 +1,42 @@
 /* ==========================================================
    SISTEMA · service worker
-   Solo escucha notificaciones. NO guarda nada en caché:
-   la app siempre se carga fresca desde la red.
+   Dos trabajos:
+   1. Guardar una copia de la app para que funcione sin internet.
+   2. Recibir las notificaciones.
+
+   La copia NUNCA se sirve si hay red: primero se pide la versión
+   nueva y solo si falla se usa la guardada. Así nunca te quedas
+   con una versión vieja, pero tampoco te quedas sin app.
    ========================================================== */
 
-self.addEventListener('install', e => self.skipWaiting());
-self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
+const CACHE = 'sistema-v1';
 
-// Sin interceptar peticiones: nada de caché, nada de versiones congeladas.
+self.addEventListener('install', e => self.skipWaiting());
+
+self.addEventListener('activate', e => e.waitUntil(
+  caches.keys()
+    .then(ns => Promise.all(ns.filter(n => n !== CACHE).map(n => caches.delete(n))))
+    .then(() => self.clients.claim())
+));
+
+self.addEventListener('fetch', e => {
+  const req = e.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;   // solo lo nuestro
+
+  e.respondWith(
+    fetch(req)
+      .then(res => {
+        if (res && res.status === 200 && res.type === 'basic') {
+          const copia = res.clone();
+          caches.open(CACHE).then(c => c.put(req, copia));
+        }
+        return res;
+      })
+      .catch(() => caches.match(req).then(g => g || caches.match('./')))
+  );
+});
 
 self.addEventListener('push', e => {
   let d = { title: 'Sistema', body: '' };
@@ -20,7 +49,7 @@ self.addEventListener('push', e => {
     badge: d.icon || './icon.png',
     tag: d.tag || 'sistema',
     renotify: true,
-    requireInteraction: true,   // se queda hasta que la toques
+    requireInteraction: true,
     data: { url: d.url || './' }
   }));
 });

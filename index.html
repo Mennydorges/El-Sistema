@@ -31,7 +31,7 @@
 /* cifras de ancho fijo en toda la app: al cambiar un número nada se recoloca */
 body,input,select,textarea,button{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
 /* ninguna cifra ni etiqueta corta parte en dos líneas empujando lo que tiene al lado */
-.at span,.at b,.umb div span,.umb div b,.esqfila span,.sem b,.catcab b,.aj span.val,
+.at span,.at b,.umb div span,.umb div b,.esqfila span,.sem b,.aj span.val,
 .dosmetas>div>span,.dosmetas b,.metabox span,.metabox b,.anillo-kcal .big,.anillo-kcal .sub,
 .item .kc,.nivel b,.nivel span{white-space:nowrap}
 html{-webkit-text-size-adjust:100%;touch-action:manipulation}
@@ -289,10 +289,17 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--cian
 
 /* ventana grande (misiones, manual) */
 .hoja{width:min(480px,94vw);max-height:82vh;overflow-y:auto;background:rgba(6,16,32,.98);
-  border:1px solid var(--linea);padding:16px 15px;
+  border:1px solid var(--linea);padding:16px 22px 16px 15px;
+  scrollbar-width:thin;scrollbar-gutter:stable;
   clip-path:polygon(15px 0,100% 0,100% calc(100% - 15px),calc(100% - 15px) 100%,0 100%,0 15px);
   transform:scaleY(.02);transition:transform .16s cubic-bezier(.2,.9,.3,1)}
 .hoja.abierto{transform:scaleY(1)}
+.hoja::-webkit-scrollbar{width:4px}
+.hoja::-webkit-scrollbar-thumb{background:var(--linea);border-radius:2px}
+.hoja::-webkit-scrollbar-track{background:transparent}
+.reslist{scrollbar-width:thin}
+.reslist::-webkit-scrollbar{width:4px}
+.reslist::-webkit-scrollbar-thumb{background:var(--linea);border-radius:2px}
 .hoja .cont{opacity:0;transition:opacity .16s ease .12s}
 .hoja.abierto .cont{opacity:1}
 .htop{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
@@ -370,7 +377,9 @@ button.lapiz.inerte{color:var(--gris);cursor:not-allowed}
 .macro.rango .bar i{background:var(--morado-luz)}
 .catcab{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;min-height:20px}
 .catcab h4{font-size:12.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--azul-claro);margin:0;font-weight:600}
-.catcab b{font-family:var(--mono);font-size:12px;color:var(--tenue)}
+.catcab b{font-family:var(--mono);font-size:11px;color:var(--tenue);text-align:right;
+  white-space:nowrap}
+.catcab h4{white-space:nowrap}
 .item{display:flex;justify-content:space-between;align-items:center;padding:8px 0;
   border-bottom:1px solid rgba(77,184,255,.1);font-size:13.5px}
 .item small{display:block;font-family:var(--mono);font-size:10.5px;color:var(--tenue);margin-top:2px}
@@ -568,7 +577,12 @@ const CLAVES=Object.keys(ATRIBUTOS);
 
 const MISIONES={
   physical:{nom:"Physical Protocol",desc:"Preséntate al entrenamiento.",xp:6,stat:"DES",stat2:"RES",maxDia:1},
-  override:{nom:"Override",desc:"Realiza el trabajo de fuerza.",xp:5,stat:"FUE",maxDia:1,metas:["sentadillas","abdominales","flexiones"]},
+  override:{nom:"Override",desc:"Realiza el trabajo de fuerza.",xp:5,stat:"FUE",maxDia:1,
+    metas:["sentadillas","abdominales","flexiones"],
+    modos:[
+      {k:"calistenia",nom:"Calistenia",det:"El trabajo de fuerza de las metas",exige:false},
+      {k:"gimnasio",  nom:"Gimnasio",  det:"Sesión completa · cuenta como entrenamiento",exige:true,marca:"physical"}
+    ]},
   cardio:{nom:"Fleet Footwork",desc:"Realiza cardio.",xp:3,stat:"RES",maxDia:{vac:2,ciclo:1},metas:["cuerda","trote","bici"],opciones:true},
   comida:{nom:"Sustenance Code",desc:"Se completa sola con 3 de estos 5 objetivos:",xp:8,stat:"CON",stat2:"DIS",maxDia:1,params:true},
   sueno:{nom:"Deep Restoration",desc:"Duerme entre 6 y 7 horas.",xp:5,stat:"CON",maxDia:1},
@@ -846,6 +860,7 @@ const FRAC={'0.5':'\u00BD'};
 // Cómo se lee el detalle guardado de una misión
 function txtDet(x){
   if(!x)return '';
+  if(x.modo!==undefined)return x.nom;
   if(x.libro!==undefined){
     const p=(x.a&&x.b)?' pp. '+x.a+'-'+x.b+(x.n?' ('+x.n+')':''):'';
     return x.libro+p;
@@ -1878,12 +1893,7 @@ function refrescar(anunciando){
   const lgNuevos=revisarLogros();
   pintarEstado();pintarMisiones();pintarComida();pintarHistorial();pintarAjustes();
   if(anunciando)anunciar(antes,R);
-  if(anunciando)for(const L of lgNuevos)
-    aviso('Logro completado',
-      '<div class="pbig" style="font-size:21px;color:var(--lg'+L.n+')">'+L.t+'</div>'+
-      '<div class="ptxt" style="margin-top:8px">'+L.d+'</div>'+
-      '<div class="ptxt" style="margin-top:6px;color:var(--tenue);font-family:var(--mono);'+
-      'font-size:10px;letter-spacing:.2em;text-transform:uppercase">'+DIF[L.n]+'</div>',true,'nivel');
+  if(anunciando)lgNuevos.forEach(avisarLogro);
   pedirBienvenida();
   pedirPeso();      // la cola las muestra en orden: nombre y luego peso
 }
@@ -2303,11 +2313,18 @@ function pintarMisiones(){
 }
 const esp=(id,nom,desc,on)=>'<button class="esp'+(on?' on':'')+'" data-e="'+id+'">'+nom+'<small>'+desc+'</small></button>';
 // Gasto diario estimado, SIN déficit: lo que necesitas para mantenerte igual.
-// ¿Ese día hubo entrenamiento? Basta con Physical Protocol u Override.
-const MIS_ENTRENO=['physical','override'];
+// ¿Ese día hubo entrenamiento de verdad?
+// Physical Protocol siempre cuenta. Override solo si fue en gimnasio:
+// veinte flexiones y unas sentadillas no mueven el gasto del día.
 function entrenoEn(clave){
-  const m=(diaDe(clave).m)||{};
-  return MIS_ENTRENO.some(id=>(m[id]||0)>0);
+  const d=diaDe(clave), m=d.m||{};
+  if((m.physical||0)>0)return true;
+  if((m.override||0)>0){
+    const dets=((d.det||{}).override)||[];
+    if(dets.some(x=>x&&x.exige))return true;
+    if(!dets.length)return true;   // registros antiguos, sin modo anotado
+  }
+  return false;
 }
 // Base de un día sin sesión de entrenamiento: ligero, no sedentario.
 // El cardio diario, caminar en el hospital y estar de pie ya viven aquí.
@@ -2405,8 +2422,10 @@ function pintarComida(){
 
   q('#c-cats').innerHTML=CATS.map(([id,nom])=>{
     const its=comidasDe(hoy).filter(c=>c.cat===id);
-    const sub=its.reduce((a,c)=>a+c.kcal,0);
-    return '<div class="v"><div class="catcab"><h4>'+nom+'</h4><b>'+Math.round(sub)+' kcal</b></div>'+
+    const sm=k=>its.reduce((a,c)=>a+(c[k]||0),0);
+    const sub=sm('kcal');
+    return '<div class="v"><div class="catcab"><h4>'+nom+'</h4><b>'+Math.round(sub)+' kcal'+
+      (its.length?' · P '+g1(sm('prot'))+' C '+g1(sm('carb'))+' G '+g1(sm('gras')):'')+'</b></div>'+
       (its.length?its.map((c,i)=>'<div class="item"><span data-ficha="'+c.ref+'" data-uid="'+c.uid+'" style="cursor:pointer">'+c.nom+
         '<small>'+(c.porc>0?txtPorc(c.porc)+' · ':'')+
         Math.round(c.g)+' '+(c.u||'g')+' · '+c.h+' · P '+g1(c.prot)+' C '+g1(c.carb)+' G '+g1(c.gras)+'</small></span>'+
@@ -2625,9 +2644,11 @@ function hojaDia(clave){
     for(const[k,nomC]of CATS){
       const its=cs.filter(x=>x.cat===k).sort((a,b)=>a.h<b.h?-1:1);
       if(!its.length)continue;
-      const kc2=Math.round(its.reduce((a,x)=>a+(x.kcal||0),0));
+      const sm=k2=>its.reduce((a,x)=>a+(x[k2]||0),0);
+      const kc2=Math.round(sm('kcal'));
       cuerpo+='<p class="nota" style="margin:10px 0 4px;display:flex;justify-content:space-between;'+
-        'gap:8px"><span>'+nomC+'</span><span>'+kc2+' kcal</span></p>'+
+        'gap:8px"><span>'+nomC+'</span><span>'+kc2+' kcal · P '+g1(sm('prot'))+
+        ' C '+g1(sm('carb'))+' G '+g1(sm('gras'))+'</span></p>'+
         its.map(x=>'<div class="item"><span>'+x.nom+
           '<small>'+x.h+' · '+(x.porc>0?txtPorc(x.porc):Math.round(x.g)+' '+(x.u||'g'))+
           ' · P '+g1(x.prot)+' C '+g1(x.carb)+' G '+g1(x.gras)+'</small></span>'+
@@ -2799,6 +2820,8 @@ q('#p-misiones').addEventListener('click',e=>{
     if(n>=maxD){confirmar(nom,'Ya la marcaste hoy. ¿Quitarla?',()=>{
       D.dias[hoy].m[id]=0; delete D.dias[hoy].m[id];
       if(D.dias[hoy].det)delete D.dias[hoy].det[id];
+      const au=D.dias[hoy].auto||{};
+      for(const k in au)if(au[k]===id){delete D.dias[hoy].m[k]; delete au[k]}
       guardar(); refrescar(true)});return}
     const anotar=extra=>{
       D.dias[hoy]=D.dias[hoy]||{}; D.dias[hoy].m=D.dias[hoy].m||{};
@@ -2806,12 +2829,23 @@ q('#p-misiones').addEventListener('click',e=>{
       if(extra){
         D.dias[hoy].det=D.dias[hoy].det||{};
         D.dias[hoy].det[id]=(D.dias[hoy].det[id]||[]).concat([extra]);
+        // un modo puede dar por cumplida otra misión
+        if(extra.marca&&!(D.dias[hoy].m[extra.marca]>0)){
+          D.dias[hoy].m[extra.marca]=1;
+          D.dias[hoy].auto=D.dias[hoy].auto||{};
+          D.dias[hoy].auto[extra.marca]=id;
+        }
       }
       guardar(); refrescar(true);
     };
     // Misiones con opciones: se pregunta cuál de ellas se hizo
     if(def.opciones&&(def.metas||[]).length){
       confirmar('¿Marcar '+nom+'?','',()=>encolar(()=>elegirMeta(def,n>0,anotar)));
+      return;
+    }
+    // Misiones con modos: cambian lo que exige el día
+    if((def.modos||[]).length){
+      confirmar('¿Marcar '+nom+'?','',()=>encolar(()=>elegirModo(def,n>0,anotar)));
       return;
     }
     // Misiones con formulario propio
@@ -2858,6 +2892,23 @@ function elegirMeta(def,repeticion,cb){
   el.querySelectorAll('[data-op]').forEach(b=>b.onclick=()=>{
     const k=b.dataset.op;
     cerrar(); cb({k:k,v:parseFloat(b.dataset.v)||0,u:M[k].u,nom:M[k].nom});
+  });
+  el.querySelector('[data-no]').onclick=()=>cerrar();
+}
+
+// Elige el modo con el que se cumplió la misión.
+// Algunos modos exigen más al cuerpo y por eso suben las calorías del día.
+function elegirModo(def,repeticion,cb){
+  const el=pop('<div class="ptit">'+def.nom+'</div>'+
+    '<div class="ptxt">¿Cómo lo hiciste?</div>'+
+    '<div class="opl">'+def.modos.map(m=>
+      '<button class="btn" data-mo="'+m.k+'">'+m.nom+'<small>'+m.det+'</small></button>').join('')+
+    '</div>'+
+    '<div class="pbtns"><button class="btn" data-no>Cancelar</button></div>',
+    {cerrarAlTocar:false,logro:!!repeticion});
+  el.querySelectorAll('[data-mo]').forEach(b=>b.onclick=()=>{
+    const m=def.modos.find(x=>x.k===b.dataset.mo);
+    cerrar(); cb({modo:m.k,nom:m.nom,exige:!!m.exige,marca:m.marca||null});
   });
   el.querySelector('[data-no]').onclick=()=>cerrar();
 }
@@ -2929,7 +2980,8 @@ function especial(id,saltarGuardia){
             '<div class="ptxt">Recompensas:<br>'+Math.round(xpg)+' XP'+
             (esqN?'<br>+'+esqN+' esquirla'+(esqN>1?'s':'')+' de INT':'')+'</div>',false,'noti');
           anunciar(antes,R);
-          pintarEstado();pintarMisiones();pintarHistorial();
+          revisarLogros().forEach(avisarLogro);   // Field Duty también desbloquea logros
+          pintarEstado();pintarMisiones();pintarHistorial();pintarAjustes();
         };
       });
     },true);
@@ -3496,7 +3548,8 @@ function listaRecetas(){
   const el=hoja('Recetas','<div class="reslist" id="rl2"></div>',
     '<button data-nuevo style="background:none;border:0;color:var(--cian);font-size:24px;cursor:pointer;padding:0 6px">+</button>',
     hojaAlim);
-  const ids=Object.keys(D.nutri.recetas);
+  const ids=Object.keys(D.nutri.recetas)
+    .sort((a,b)=>norm(D.nutri.recetas[a].nom).localeCompare(norm(D.nutri.recetas[b].nom)));
   el.querySelector('#rl2').innerHTML=ids.map(id=>{const r=D.nutri.recetas[id];
     const u=recetaPorG(r);
     return '<div class="item"><span data-ver="'+id+'" style="cursor:pointer;flex:1">'+r.nom+
@@ -3571,10 +3624,21 @@ function formReceta(idArg,volver){
     r.unidad=el.querySelector('#r-u').value;
     r.porciones=parseInt(el.querySelector('#r-po').value,10)||0;
     cerrar();
-    encolar(()=>{
+    encolar(pantallaIngrediente);
+  };
+  function pantallaIngrediente(){
+    {
       const e2=hoja('Ingrediente',
         '<div class="camp buscador"><input type="text" id="iq" placeholder="Buscar alimento"></div>'+
-        '<div class="reslist" id="il"></div>',null,()=>formReceta());
+        '<div class="reslist" id="il"></div>',
+        '<button data-nuevoal style="background:none;border:0;color:var(--cian);font-size:24px;'+
+        'cursor:pointer;padding:0 6px">+</button>',
+        ()=>formReceta());
+      // Crear un alimento nuevo sin perder la receta que se está editando
+      e2.querySelector('[data-nuevoal]').onclick=()=>{
+        cerrar();
+        encolar(()=>formAlimento(null,pantallaIngrediente));
+      };
       const pin=()=>{
         const f=norm(e2.querySelector('#iq').value);
         const ids=Object.keys(D.nutri.alimentos).filter(x=>!f||norm(D.nutri.alimentos[x].nom).includes(f)||norm(D.nutri.alimentos[x].marca).includes(f));
@@ -3628,8 +3692,8 @@ function formReceta(idArg,volver){
         });
       };
       e2.querySelector('#iq').addEventListener('input',pin); pin();
-    });
-  };
+    }
+  }
   el.querySelector('[data-ok]').onclick=()=>{
     r.nom=el.querySelector('#r-n').value.trim();
     r.pesoFinal=parseFloat(el.querySelector('#r-pf').value)||0;
@@ -3837,6 +3901,13 @@ function tituloActivo(){
 }
 const DIF=['','Trivial','Exigente','Difícil'];
 // Revisa condiciones y devuelve lo recién desbloqueado.
+function avisarLogro(L){
+  aviso('Logro completado',
+    '<div class="pbig" style="font-size:21px;color:var(--lg'+L.n+')">'+L.t+'</div>'+
+    '<div class="ptxt" style="margin-top:8px">'+L.d+'</div>'+
+    '<div class="ptxt" style="margin-top:6px;color:var(--tenue);font-family:var(--mono);'+
+    'font-size:10px;letter-spacing:.2em;text-transform:uppercase">'+DIF[L.n]+'</div>',true,'nivel');
+}
 function revisarLogros(){
   D.logros=D.logros||{};
   let X;try{X=ctxLogros()}catch(e){return []}
@@ -4305,8 +4376,13 @@ function hojaManual(){
     '<p>Un día se marca como cumplido cuando llegaste al mínimo de misiones de la racha, o cuando quedó escudado por Field Duty, Triage o Critical Condition. En esos días las misiones que no hiciste no cuentan como falladas en la lista de "Misiones que más fallas": Physical Protocol es de 3 días por semana, así que no entrenar un martes no es un fallo si el día lo cumpliste igual.</p>'+
     '<p class="eyebrow" style="margin-top:16px">Líquidos por peso</p>'+
     '<p>Los alimentos y las recetas en mililitros pueden llevar anotado cuánto pesan 100 ml. Con ese dato, al registrarlos aparece una opción extra para meter gramos de balanza en vez de mililitros, y el Sistema convierte. Los genéricos líquidos ya vienen con su peso puesto; en los tuyos, el campo sale al elegir mililitros.</p>'+
+    '<p class="eyebrow" style="margin-top:16px">Sin internet</p>'+
+    '<p>El Sistema guarda una copia de sí mismo en el teléfono. Si un día te quedas sin conexión, la app abre igual y puedes registrar todo con normalidad; tus datos siempre estuvieron en el teléfono, nunca en un servidor. Lo único que no funciona sin internet son las notificaciones, porque esas llegan de fuera. Cuando vuelve la conexión, el Sistema pide la versión más reciente, así que la copia guardada nunca te deja con una versión vieja.</p>'+
     '<p class="eyebrow" style="margin-top:16px">Registro completo</p>'+
     '<p>El mapa de la pestaña Historial solo muestra las últimas 12 semanas. En Ajustes › Registro completo están todos los días desde que arrancaste, agrupados por mes, con las misiones que hiciste, las horas de turno, el peso y las calorías de cada uno. Tocando cualquiera se abre su ficha. No ocupa espacio extra: son los mismos datos que ya guardas, mostrados de otra forma.</p>'+
+    '<p class="eyebrow" style="margin-top:16px">Override · calistenia o gimnasio</p>'+
+    '<p>Al marcar Override el Sistema pregunta cómo lo hiciste. En Calistenia cuentan las metas de siempre: da la XP, el punto de umbral y las esquirlas igual, pero no toca las calorías del día, porque unas flexiones y sentadillas no mueven el gasto. En Gimnasio, además de todo lo anterior, se da por cumplido Physical Protocol y sí suben las calorías del día, porque una sesión completa sí es un entrenamiento.</p>'+
+    '<p>Si desmarcas un Override que se hizo en gimnasio, Physical Protocol se desmarca también, salvo que lo hubieras marcado tú por tu cuenta antes.</p>'+
     '<p class="eyebrow" style="margin-top:16px">Misiones con opciones</p>'+
     '<p>Fleet Footwork admite tres formas de cumplirse. Al marcarla el Sistema te pregunta cuál hiciste y guarda la elección con la meta de ese día congelada, así que en el historial verás no solo que la completaste sino qué hiciste: saltos de cuerda, trote o bici, y cuánto tocaba en ese momento. Si la repites, la segunda vez el selector sale en violeta, como el resto de repeticiones.</p>'+
     '<p>Lorekeeper pregunta qué libro leíste y de qué página a cuál. Te propone el último libro registrado para no reescribirlo, y calcula solo cuántas páginas fueron. Todo eso queda en la ficha de ese día.</p>'+
