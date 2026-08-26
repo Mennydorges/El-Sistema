@@ -1893,7 +1893,9 @@ function refrescar(anunciando){
   const lgNuevos=revisarLogros();
   pintarEstado();pintarMisiones();pintarComida();pintarHistorial();pintarAjustes();
   if(anunciando)anunciar(antes,R);
-  if(anunciando)lgNuevos.forEach(avisarLogro);
+  // Un logro se anuncia siempre que se desbloquee, venga de donde venga:
+  // registrar peso, una comida, cambiar de modo o cerrar un bloque.
+  if(arranqueHecho)lgNuevos.forEach(avisarLogro);
   pedirBienvenida();
   pedirPeso();      // la cola las muestra en orden: nombre y luego peso
 }
@@ -2980,7 +2982,7 @@ function especial(id,saltarGuardia){
             '<div class="ptxt">Recompensas:<br>'+Math.round(xpg)+' XP'+
             (esqN?'<br>+'+esqN+' esquirla'+(esqN>1?'s':'')+' de INT':'')+'</div>',false,'noti');
           anunciar(antes,R);
-          revisarLogros().forEach(avisarLogro);   // Field Duty también desbloquea logros
+          revisarLogros().forEach(avisarLogro);
           pintarEstado();pintarMisiones();pintarHistorial();pintarAjustes();
         };
       });
@@ -3908,6 +3910,7 @@ function avisarLogro(L){
     '<div class="ptxt" style="margin-top:6px;color:var(--tenue);font-family:var(--mono);'+
     'font-size:10px;letter-spacing:.2em;text-transform:uppercase">'+DIF[L.n]+'</div>',true,'nivel');
 }
+let arranqueHecho=false;   // durante el arranque los logros se ponen al día en silencio
 function revisarLogros(){
   D.logros=D.logros||{};
   let X;try{X=ctxLogros()}catch(e){return []}
@@ -4458,6 +4461,7 @@ q('#archivo').addEventListener('change',e=>{
   nutriInit();
   reconstruirCatalogo();
   refrescar();
+  arranqueHecho=true;   // a partir de aquí, todo logro nuevo se anuncia
   swInit();
   let ultimo=hoyLogico();
   setInterval(()=>{const h=hoyLogico();if(h!==ultimo){ultimo=h;refrescar(true)}},60000);
