@@ -379,6 +379,12 @@ button.lapiz.inerte{color:var(--gris);cursor:not-allowed}
 .addbtn{width:100%;background:rgba(77,184,255,.06);border:1px dashed var(--linea);color:var(--azul);
   font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
   padding:10px;margin-top:8px;cursor:pointer}
+.opl{display:flex;flex-direction:column;gap:8px;margin:14px 0 12px}
+.opl .btn{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.opl .btn small{font-family:var(--mono);font-size:11px;color:var(--tenue);letter-spacing:0;
+  text-transform:none}
+.pop.logro .opl .btn{border-color:var(--morado-luz);color:var(--morado-luz)}
+.pop.logro .opl .btn small{color:var(--morado-luz);opacity:.7}
 .par{display:flex;align-items:center;gap:9px;padding:6px 0;font-size:13.5px;flex-wrap:nowrap;
   min-height:29px}
 .par>span:not(.det){flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -521,6 +527,7 @@ button.lapiz.inerte{color:var(--gris);cursor:not-allowed}
     <div class="aj" data-aj="misiones">Misiones<span class="val">›</span></div>
     <div class="aj" data-aj="sonido">Sonido<span class="val" id="a-son">Activado</span></div>
     <div class="aj" data-aj="manual">Manual<span class="val">›</span></div>
+    <div class="aj" data-aj="registro">Registro completo<span class="val" id="a-registro">0</span></div>
     <div class="aj" data-aj="avisos">Notificaciones<span class="val" id="a-avisos">—</span></div>
     <div class="aj" data-aj="logros" style="border:0">Logros<span class="val" id="a-logros">0</span></div>
   </div>
@@ -566,7 +573,7 @@ const MISIONES={
   comida:{nom:"Sustenance Code",desc:"Se completa sola con 3 de estos 5 objetivos:",xp:8,stat:"CON",stat2:"DIS",maxDia:1,params:true},
   sueno:{nom:"Deep Restoration",desc:"Duerme entre 6 y 7 horas.",xp:5,stat:"CON",maxDia:1},
   estudio:{nom:"Scholar's Focus",desc:{vac:"Estudia media hora en el día.",ciclo:"Estudia una hora en el día, con la lectura incluida."},xp:{vac:6,ciclo:8},stat:"INT",maxDia:3},
-  lectura:{nom:"Lorekeeper",desc:"Lee las páginas del día.",xp:4,stat:"INT",maxDia:1,opcionalEn:"ciclo",metas:["paginas"]},
+  lectura:{nom:"Lorekeeper",form:"lectura",desc:"Lee las páginas del día.",xp:4,stat:"INT",maxDia:1,opcionalEn:"ciclo",metas:["paginas"]},
   cama:{nom:"Camp Setup",desc:"Tiende la cama.",xp:2,stat:"DIS",maxDia:1,opcional:true},
   cocina:{nom:"Mess Hall Reset",desc:"Deja la cocina limpia.",xp:2,stat:"DIS",maxDia:1,opcional:true}
 };
@@ -836,6 +843,15 @@ const uni=a=>(a&&a.unidad==='ml')?'ml':'g';
 const g1=v=>{const n=+v||0; return n<10?Math.round(n*10)/10:Math.round(n)};
 // 1.5 se lee mejor como 1½
 const FRAC={'0.5':'\u00BD'};
+// Cómo se lee el detalle guardado de una misión
+function txtDet(x){
+  if(!x)return '';
+  if(x.libro!==undefined){
+    const p=(x.a&&x.b)?' pp. '+x.a+'-'+x.b+(x.n?' ('+x.n+')':''):'';
+    return x.libro+p;
+  }
+  return x.nom+' '+x.v+(x.u?' '+x.u:'');
+}
 function txtPorc(p){
   const n=Math.floor(p), f=Math.round((p-n)*100)/100;
   const fr=FRAC[String(f)];
@@ -1549,6 +1565,24 @@ function ticsXP(n){
 const q=s=>document.querySelector(s);
 const capa=q('#capa');
 let cola=[],mostrando=false,cadena=false,tok=0;
+
+// Al volver a un campo, el cursor va al final de lo escrito, no al principio.
+document.addEventListener('focusin',e=>{
+  const n=e.target;
+  if(!n||(n.tagName!=='INPUT'&&n.tagName!=='TEXTAREA'))return;
+  const t=(n.type||'').toLowerCase();
+  if(['checkbox','radio','range','button','submit','file','color'].includes(t))return;
+  setTimeout(()=>{
+    if(document.activeElement!==n)return;
+    try{
+      if(n.tagName==='TEXTAREA'||['text','search','url','tel','password'].includes(t)){
+        const f=n.value.length; n.setSelectionRange(f,f);
+      }else{                       // number y demás: reasignar deja el cursor al final
+        const v=n.value; n.value=''; n.value=v;
+      }
+    }catch(err){}
+  },0);
+});
 
 function pop(html,opts){
   opts=opts||{};
@@ -2568,7 +2602,9 @@ function hojaDia(clave){
     const v=veces(clave,id); if(!v)continue;
     const op=opcionalEnModo(def,modo);
     const corto=def.cuotaDia&&v<def.cuotaDia;
-    filas.push('<div class="sem"><span>'+def.nom+(op?' · opcional':'')+'</span>'+
+    const dets=((d.det||{})[id]||[]);
+    filas.push('<div class="sem"><span>'+def.nom+(op?' · opcional':'')+
+      (dets.length?'<small>'+dets.map(txtDet).join('  \u00B7  ')+'</small>':'')+'</span>'+
       '<b style="margin-left:auto;color:'+(corto?'var(--tenue)':'var(--azul-claro)')+'">'+
       (def.params?'cumplida':(v>1?v+'\u00D7':'hecha')+(corto?' · '+v+'/'+def.cuotaDia:''))+'</b></div>');
   }
@@ -2704,6 +2740,8 @@ function pintarAjustes(){
   q('#a-cal').textContent=metaCal(hoyComida())+' kcal';
   const dias=D.ultimoRespaldo?dif(D.ultimoRespaldo,hoyLogico()):null;
   q('#a-logros').textContent=LOGROS.filter(l=>(D.logros||{})[l.id]).length;
+  const nR=q('#a-registro');
+  if(nR)nR.textContent=dif(D.arranque||D.inicio,hoyLogico())+1;
   pintarAvisos();
   q('#a-resp').textContent=dias==null?'Todavía no has exportado ningún respaldo.':
     dias>=14?'Último respaldo hace '+dias+' días. Toca exportar uno.':'Último respaldo hace '+dias+' día'+(dias===1?'':'s')+'.';
@@ -2759,11 +2797,29 @@ q('#p-misiones').addEventListener('click',e=>{
     const n=veces(hoy,id);
     const nom=def.nom;
     if(n>=maxD){confirmar(nom,'Ya la marcaste hoy. ¿Quitarla?',()=>{
-      D.dias[hoy].m[id]=0; delete D.dias[hoy].m[id]; guardar(); refrescar(true)});return}
-    confirmar('¿Marcar '+nom+'?','',()=>{
+      D.dias[hoy].m[id]=0; delete D.dias[hoy].m[id];
+      if(D.dias[hoy].det)delete D.dias[hoy].det[id];
+      guardar(); refrescar(true)});return}
+    const anotar=extra=>{
       D.dias[hoy]=D.dias[hoy]||{}; D.dias[hoy].m=D.dias[hoy].m||{};
-      D.dias[hoy].m[id]=(D.dias[hoy].m[id]||0)+1; guardar(); refrescar(true);
-    });
+      D.dias[hoy].m[id]=(D.dias[hoy].m[id]||0)+1;
+      if(extra){
+        D.dias[hoy].det=D.dias[hoy].det||{};
+        D.dias[hoy].det[id]=(D.dias[hoy].det[id]||[]).concat([extra]);
+      }
+      guardar(); refrescar(true);
+    };
+    // Misiones con opciones: se pregunta cuál de ellas se hizo
+    if(def.opciones&&(def.metas||[]).length){
+      confirmar('¿Marcar '+nom+'?','',()=>encolar(()=>elegirMeta(def,n>0,anotar)));
+      return;
+    }
+    // Misiones con formulario propio
+    if(def.form==='lectura'){
+      confirmar('¿Marcar '+nom+'?','',()=>encolar(()=>formLectura(def,n>0,anotar)));
+      return;
+    }
+    confirmar('¿Marcar '+nom+'?','',()=>anotar(null));
     return;
   }
   const bw=e.target.closest('[data-w]');
@@ -2783,6 +2839,66 @@ q('#p-misiones').addEventListener('click',e=>{
   const be=e.target.closest('[data-e]');
   if(be)especial(be.dataset.e);
 });
+
+// Pregunta cuál de las opciones de la misión se hizo y devuelve
+// la opción con el valor de meta congelado en ese momento.
+function elegirMeta(def,repeticion,cb){
+  const M=MTS(), q=Math.floor(dif(D.inicio,hoyLogico())/14);
+  const ops=(def.metas||[]).filter(k=>M[k]);
+  if(!ops.length){cb(null);return}
+  const el=pop('<div class="ptit">'+def.nom+'</div>'+
+    '<div class="ptxt">¿Qué hiciste?</div>'+
+    '<div class="opl">'+ops.map(k=>{
+      const v=metaVal(k,q,D.techos[k]);
+      return '<button class="btn" data-op="'+k+'" data-v="'+v+'">'+
+        M[k].nom+'<small>'+v+' '+M[k].u+'</small></button>';
+    }).join('')+'</div>'+
+    '<div class="pbtns"><button class="btn" data-no>Cancelar</button></div>',
+    {cerrarAlTocar:false,logro:!!repeticion});
+  el.querySelectorAll('[data-op]').forEach(b=>b.onclick=()=>{
+    const k=b.dataset.op;
+    cerrar(); cb({k:k,v:parseFloat(b.dataset.v)||0,u:M[k].u,nom:M[k].nom});
+  });
+  el.querySelector('[data-no]').onclick=()=>cerrar();
+}
+
+// Qué libro y qué páginas se leyeron
+function formLectura(def,repeticion,cb){
+  const prev=ultimoLibro();
+  const el=pop('<div class="ptit">'+def.nom+'</div>'+
+    '<div class="camp"><label>Libro</label>'+
+    '<input type="text" id="lk-l" value="'+(prev||'').replace(/"/g,'&quot;')+'" placeholder="Título y autor"></div>'+
+    '<div class="camp"><label>Páginas</label><div class="reloj">'+
+    '<input type="number" id="lk-a" inputmode="numeric" placeholder="de">'+
+    '<b>\u2192</b>'+
+    '<input type="number" id="lk-b" inputmode="numeric" placeholder="a">'+
+    '</div></div>'+
+    '<div id="lk-r" class="nota"></div>'+
+    '<div class="pbtns"><button class="btn" data-si>Registrar</button>'+
+    '<button class="btn" data-no>Cancelar</button></div>',
+    {cerrarAlTocar:false,logro:!!repeticion});
+  const gv=x=>parseInt(el.querySelector(x).value,10);
+  const prev2=()=>{const a=gv('#lk-a'),b=gv('#lk-b');
+    el.querySelector('#lk-r').textContent=(a>0&&b>=a)?(b-a+1)+' páginas':''};
+  ['#lk-a','#lk-b'].forEach(x=>el.querySelector(x).addEventListener('input',prev2));
+  el.querySelector('[data-no]').onclick=()=>cerrar();
+  el.querySelector('[data-si]').onclick=()=>{
+    const libro=el.querySelector('#lk-l').value.trim();
+    const a=gv('#lk-a'), b=gv('#lk-b');
+    cerrar();
+    cb({libro:libro||'Sin título',a:a>0?a:null,b:b>0?b:null,
+      n:(a>0&&b>=a)?(b-a+1):null});
+  };
+}
+// El último libro registrado, para no tener que reescribirlo
+function ultimoLibro(){
+  const cs=Object.keys(D.dias).sort().reverse();
+  for(const c of cs){
+    const ds=((D.dias[c].det||{}).lectura)||[];
+    if(ds.length&&ds[ds.length-1].libro)return ds[ds.length-1].libro;
+  }
+  return '';
+}
 
 function especial(id,saltarGuardia){
   const hoy=hoyLogico(),d=diaDe(hoy);
@@ -2930,6 +3046,7 @@ q('#p-ajustes').addEventListener('click',e=>{
   if(s==='alim')hojaAlim();
 
   if(s==='misiones')hojaMisiones();
+  if(s==='registro')hojaRegistro();
   if(s==='avisos')hojaAvisos();
   if(s==='logros')hojaLogros();
   if(s==='sonido'){D.sonido=(D.sonido===false);guardar();refrescar();if(D.sonido!==false)sfx('noti');return}
@@ -3772,6 +3889,47 @@ function copiarClave(el,btn){
     try{document.execCommand('copy'); ok()}catch(e){}
   }
 }
+// Todos los días desde el arranque, agrupados por mes.
+function hojaRegistro(){
+  const hoy=hoyLogico(), ini=D.arranque||D.inicio;
+  const total=dif(ini,hoy)+1;
+  const MESL=['enero','febrero','marzo','abril','mayo','junio','julio','agosto',
+    'septiembre','octubre','noviembre','diciembre'];
+  let cuerpo='<p class="nota" style="margin:0 0 12px">'+total+
+    (total===1?' día':' días')+' desde el '+fechaCorta(ini)+'. Toca cualquiera para ver el detalle.</p>';
+  let mesAct='';
+  const filas=[];
+  for(let i=total-1;i>=0;i--){
+    const c=sumar(ini,i);
+    const [aa,mm2,dd2]=c.split('-').map(Number);
+    const mk=aa+'-'+mm2;
+    if(mk!==mesAct){mesAct=mk;
+      filas.push('<p class="eyebrow" style="margin:16px 0 6px">'+MESL[mm2-1]+' '+aa+'</p>')}
+    const d=diaDe(c), n=hechasEn(c), minR=CFG.rachaMin[kMod(modoEn(c))];
+    let et,col;
+    if(enCritical(c)){et='Critical Condition';col='var(--rojo)'}
+    else if(d.triage){et='Triage';col='var(--morado-luz)'}
+    else if(turnoEscuda(c)){et=d.turno+' h de turno';col='var(--morado-luz)'}
+    else if(n>=minR){et=n+' misiones';col='var(--cian)'}
+    else{
+      const vacio=!Object.keys(d.m||{}).length&&!(d.comidas||[]).length&&!d.peso&&!d.turno;
+      et=vacio?'sin registro':n+' de '+minR;
+      col=vacio?'var(--gris)':'var(--tenue)';
+    }
+    const extras=[];
+    if(d.turno>0&&!turnoEscuda(c))extras.push(d.turno+' h');
+    if(d.peso>0)extras.push(d.peso+' kg');
+    if((d.comidas||[]).length)extras.push(Math.round(totalesDia(c).kcal)+' kcal');
+    filas.push('<div class="sem" data-dia="'+c+'" style="cursor:pointer">'+
+      '<span>'+dd2+' \u00B7 '+['dom','lun','mar','mié','jue','vie','sáb'][dow(c)]+
+      (extras.length?'<small>'+extras.join('  \u00B7  ')+'</small>':'')+'</span>'+
+      '<b style="margin-left:auto;color:'+col+'">'+et+'</b></div>');
+  }
+  const el=hoja('Registro completo',cuerpo+filas.join(''));
+  el.addEventListener('click',e=>{const r=e.target.closest('[data-dia]');
+    if(r){cerrar(); encolar(()=>hojaDia(r.dataset.dia))}});
+}
+
 function hojaAvisos(){
   const e=estadoAvisos();
   let cuerpo='';
@@ -4147,6 +4305,11 @@ function hojaManual(){
     '<p>Un día se marca como cumplido cuando llegaste al mínimo de misiones de la racha, o cuando quedó escudado por Field Duty, Triage o Critical Condition. En esos días las misiones que no hiciste no cuentan como falladas en la lista de "Misiones que más fallas": Physical Protocol es de 3 días por semana, así que no entrenar un martes no es un fallo si el día lo cumpliste igual.</p>'+
     '<p class="eyebrow" style="margin-top:16px">Líquidos por peso</p>'+
     '<p>Los alimentos y las recetas en mililitros pueden llevar anotado cuánto pesan 100 ml. Con ese dato, al registrarlos aparece una opción extra para meter gramos de balanza en vez de mililitros, y el Sistema convierte. Los genéricos líquidos ya vienen con su peso puesto; en los tuyos, el campo sale al elegir mililitros.</p>'+
+    '<p class="eyebrow" style="margin-top:16px">Registro completo</p>'+
+    '<p>El mapa de la pestaña Historial solo muestra las últimas 12 semanas. En Ajustes › Registro completo están todos los días desde que arrancaste, agrupados por mes, con las misiones que hiciste, las horas de turno, el peso y las calorías de cada uno. Tocando cualquiera se abre su ficha. No ocupa espacio extra: son los mismos datos que ya guardas, mostrados de otra forma.</p>'+
+    '<p class="eyebrow" style="margin-top:16px">Misiones con opciones</p>'+
+    '<p>Fleet Footwork admite tres formas de cumplirse. Al marcarla el Sistema te pregunta cuál hiciste y guarda la elección con la meta de ese día congelada, así que en el historial verás no solo que la completaste sino qué hiciste: saltos de cuerda, trote o bici, y cuánto tocaba en ese momento. Si la repites, la segunda vez el selector sale en violeta, como el resto de repeticiones.</p>'+
+    '<p>Lorekeeper pregunta qué libro leíste y de qué página a cuál. Te propone el último libro registrado para no reescribirlo, y calcula solo cuántas páginas fueron. Todo eso queda en la ficha de ese día.</p>'+
     '<p class="eyebrow" style="margin-top:16px">Historial · misiones</p>'+
     '<p>La tabla muestra dos columnas por misión: cuántas veces la cumpliste y cuántas la fallaste. Una misión solo suma fallo en un día que quedó incompleto: si llegaste al mínimo de la racha o el día estuvo escudado, nada cuenta en tu contra. Las opcionales suman cumplidas pero nunca falladas. Debajo van los parámetros de Sustenance Code con las mismas dos columnas, y al final el uso de las especiales.</p>'+
     '<p class="eyebrow" style="margin-top:16px">Notificaciones</p>'+

@@ -23,9 +23,9 @@
    ========================================================== */
 
 const AVISOS = {
-  6:  ['Un nuevo día',      'Tus misiones diarias están disponibles de nuevo.'],
-  14: ['Mitad del día',     'Revisa qué te falta por completar.'],
-  21: ['Cierre del día',    'Recuerda marcar las diarias de hoy.']
+  6:  ['Notificación', '¡Es un nuevo día! Tus misiones diarias vuelven a estar disponibles.'],
+  15: ['Notificación', 'El día ha terminado. Aún puedes completar tus misiones diarias.'],
+  21: ['Notificación', 'No olvides registrar las misiones que completaste hoy.']
 };
 
 /* ==========================================================
