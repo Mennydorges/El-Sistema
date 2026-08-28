@@ -472,7 +472,7 @@ button.lapiz.inerte{color:var(--gris);cursor:not-allowed}
     <svg id="e-peso" width="100%" height="auto" viewBox="0 0 320 150" preserveAspectRatio="xMidYMid meet" style="display:block;touch-action:none;cursor:grab"></svg>
     <p class="nota" id="e-pesorango" style="text-align:center;margin:4px 0 0"></p>
     <div class="fila" style="margin-top:10px" id="e-filapeso">
-      <input type="number" id="e-kg" step="0.1" min="30" max="250" placeholder="kg" inputmode="decimal" aria-label="Peso">
+      <input type="text" id="e-kg" placeholder="kg" inputmode="text" aria-label="Peso">
       <button class="btn" id="e-guardapeso">Guardar</button>
     </div>
     <p class="nota" id="e-pesonota">Se registra los domingos en ayunas. No da XP ni mueve atributos.</p>
@@ -855,17 +855,19 @@ const uni=a=>(a&&a.unidad==='ml')?'ml':'g';
 // gramos de macro: con un decimal por debajo de 10, para que las verduras
 // no aparezcan con 0 cuando en realidad tienen décimas
 const g1=v=>{const n=+v||0; return n<10?Math.round(n*10)/10:Math.round(n)};
+// En el teclado del teléfono el decimal se escribe con coma: aquí vale igual.
+const num=v=>parseFloat(String(v==null?'':v).replace(',','.').replace(/[^0-9.\-]/g,''));
 // 1.5 se lee mejor como 1½
 const FRAC={'0.5':'\u00BD'};
 // Cómo se lee el detalle guardado de una misión
 function txtDet(x){
   if(!x)return '';
-  if(x.modo!==undefined)return x.nom;
+  if(x.modo!==undefined)return x.nom+(x.nota?' · '+x.nota:'');
   if(x.libro!==undefined){
     const p=(x.a&&x.b)?' pp. '+x.a+'-'+x.b+(x.n?' ('+x.n+')':''):'';
     return x.libro+p;
   }
-  return x.nom+' '+x.v+(x.u?' '+x.u:'');
+  return x.nom+' '+x.v+(x.u?' '+x.u:'')+(x.nota?' · '+x.nota:'');
 }
 function txtPorc(p){
   const n=Math.floor(p), f=Math.round((p-n)*100)/100;
@@ -1846,16 +1848,16 @@ function pedirPeso(){
     encolar(()=>{
       const el=pop('<div class="ptit">Peso inicial</div>'+
         '<div class="ptxt">Es el punto de partida de tu curva. De aquí en adelante se registra los domingos, en ayunas.</div>'+
-        '<div class="camp" style="margin-top:14px"><input type="number" id="pw0" step="0.1" inputmode="decimal" placeholder="kg"></div>'+
+        '<div class="camp" style="margin-top:14px"><input type="text" id="pw0" inputmode="text" placeholder="kg"></div>'+
         '<div class="pbtns"><button class="btn inerte" data-si>Guardar</button></div>',
         {cerrarAlTocar:false});
       const inp0=el.querySelector('#pw0'),bt0=el.querySelector('[data-si]');
-      const val0=()=>{const v=parseFloat(inp0.value);bt0.classList.toggle('inerte',!(v>=30&&v<=250))};
+      const val0=()=>{const v=num(inp0.value);bt0.classList.toggle('inerte',!(v>=30&&v<=250))};
       inp0.addEventListener('input',val0);
       setTimeout(()=>inp0.focus(),200);
       bt0.onclick=()=>{
         if(bt0.classList.contains('inerte'))return;
-        const v=parseFloat(inp0.value);
+        const v=num(inp0.value);
         if(!(v>=30&&v<=250))return;
         cerrar(); D.dias[hoy]=D.dias[hoy]||{}; D.dias[hoy].peso=v; guardar(); refrescar();
       };
@@ -1868,16 +1870,16 @@ function pedirPeso(){
   encolar(()=>{
     const el=pop('<div class="ptit">Registro de peso</div>'+
       '<div class="ptxt">Se debe registrar en ayunas.</div>'+
-      '<div class="camp" style="margin-top:14px"><input type="number" id="pw" step="0.1" inputmode="decimal" placeholder="kg"></div>'+
+      '<div class="camp" style="margin-top:14px"><input type="text" id="pw" inputmode="text" placeholder="kg"></div>'+
       '<div class="pbtns"><button class="btn inerte" data-si>Guardar</button></div>',
       {cerrarAlTocar:false});
     const inp=el.querySelector('#pw'),bt=el.querySelector('[data-si]');
-    const val=()=>{const v=parseFloat(inp.value);bt.classList.toggle('inerte',!(v>=30&&v<=250))};
+    const val=()=>{const v=num(inp.value);bt.classList.toggle('inerte',!(v>=30&&v<=250))};
     inp.addEventListener('input',val);
     setTimeout(()=>inp.focus(),200);
     bt.onclick=()=>{
       if(bt.classList.contains('inerte'))return;
-      const v=parseFloat(inp.value);
+      const v=num(inp.value);
       if(!(v>=30&&v<=250))return;
       cerrar();
       D.dias[hoy]=D.dias[hoy]||{}; D.dias[hoy].peso=v;
@@ -2423,14 +2425,14 @@ function pintarComida(){
     '<div class="estado-mis '+(n>=3?'ok':'no')+'">'+n+' / 5 · '+(n>=3?'MISSION COMPLETE':'MISSION FAILED')+'</div>';
 
   q('#c-cats').innerHTML=CATS.map(([id,nom])=>{
-    const its=comidasDe(hoy).filter(c=>c.cat===id);
+    const its=comidasDe(hoy).filter(c=>c.cat===id).sort((a,b)=>(a.h||'')<(b.h||'')?-1:1);
     const sm=k=>its.reduce((a,c)=>a+(c[k]||0),0);
     const sub=sm('kcal');
     return '<div class="v"><div class="catcab"><h4>'+nom+'</h4><b>'+Math.round(sub)+' kcal'+
       (its.length?' · P '+g1(sm('prot'))+' C '+g1(sm('carb'))+' G '+g1(sm('gras')):'')+'</b></div>'+
       (its.length?its.map((c,i)=>'<div class="item"><span data-ficha="'+c.ref+'" data-uid="'+c.uid+'" style="cursor:pointer">'+c.nom+
-        '<small>'+(c.porc>0?txtPorc(c.porc)+' · ':'')+
-        Math.round(c.g)+' '+(c.u||'g')+' · '+c.h+' · P '+g1(c.prot)+' C '+g1(c.carb)+' G '+g1(c.gras)+'</small></span>'+
+        '<small>'+c.h+' · '+(c.porc>0?txtPorc(c.porc)+' · ':'')+
+        Math.round(c.g)+' '+(c.u||'g')+' · P '+g1(c.prot)+' C '+g1(c.carb)+' G '+g1(c.gras)+'</small></span>'+
         '<span class="kc">'+Math.round(c.kcal)+'</span>'+
         '<button data-borra="'+c.uid+'">×</button></div>').join('')
         :'<p class="nota" style="margin:0">Sin registros.</p>')+
@@ -2541,7 +2543,7 @@ function cantidadComida(cat,ref,volver){
       (dens?'<option value="p">gramos en balanza (100 ml = '+dens+' g)</option>':'')+
       '</select></div>':'')+
     '<div class="camp"><label id="lq">Cantidad en '+(md?nomU('m'):nomU('g'))+'</label>'+
-    '<input type="number" id="gq" step="0.1" inputmode="decimal" value="'+(md?1:100)+'"></div>'+
+    '<input type="text" id="gq" inputmode="text" value="'+(md?1:100)+'"></div>'+
     '<div class="camp"><label>Hora</label><div class="reloj">'+
     '<input type="number" id="hq" min="0" max="23" step="1" inputmode="numeric" value="'+hHoy+'">'+
     '<b>:</b>'+
@@ -2556,7 +2558,7 @@ function cantidadComida(cat,ref,volver){
   const modoMq=()=>hayMq?el.querySelector('#mq').value:'g';
   const enMedida=()=>md&&modoMq()==='m';
   // siempre se guarda en la unidad nativa del alimento
-  const gramosReales=()=>{const v=parseFloat(el.querySelector('#gq').value)||0, k=modoMq();
+  const gramosReales=()=>{const v=num(el.querySelector('#gq').value)||0, k=modoMq();
     if(k==='m')return v*md.g;
     if(k==='p')return v*100/dens;      // gramos pesados → mililitros
     return v};
@@ -2587,7 +2589,7 @@ function cantidadComida(cat,ref,volver){
     const n=nutreDe(ref,g); if(!n)return;
     const hoy=hoyComida();
     D.dias[hoy]=D.dias[hoy]||{}; D.dias[hoy].comidas=D.dias[hoy].comidas||[];
-    const porc=(esR&&enMedida())?(parseFloat(el.querySelector('#gq').value)||0):0;
+    const porc=(esR&&enMedida())?(num(el.querySelector('#gq').value)||0):0;
     D.dias[hoy].comidas.push({uid:'c'+Date.now().toString(36),cat,ref,nom,g,h,u,porc,
       kcal:n.kcal,prot:n.prot,carb:n.carb,gras:n.gras,
       snap:esR?congelarReceta(ref.slice(2)):null});
@@ -2889,11 +2891,13 @@ function elegirMeta(def,repeticion,cb){
       return '<button class="btn" data-op="'+k+'" data-v="'+v+'">'+
         M[k].nom+'<small>'+v+' '+M[k].u+'</small></button>';
     }).join('')+'</div>'+
+    '<div class="camp"><label>Nota, opcional</label>'+
+    '<input type="text" id="op-n" placeholder="5 series de 100"></div>'+
     '<div class="pbtns"><button class="btn" data-no>Cancelar</button></div>',
     {cerrarAlTocar:false,logro:!!repeticion});
   el.querySelectorAll('[data-op]').forEach(b=>b.onclick=()=>{
-    const k=b.dataset.op;
-    cerrar(); cb({k:k,v:parseFloat(b.dataset.v)||0,u:M[k].u,nom:M[k].nom});
+    const k=b.dataset.op, nota=el.querySelector('#op-n').value.trim();
+    cerrar(); cb({k:k,v:parseFloat(b.dataset.v)||0,u:M[k].u,nom:M[k].nom,nota:nota||null});
   });
   el.querySelector('[data-no]').onclick=()=>cerrar();
 }
@@ -2906,11 +2910,14 @@ function elegirModo(def,repeticion,cb){
     '<div class="opl">'+def.modos.map(m=>
       '<button class="btn" data-mo="'+m.k+'">'+m.nom+'<small>'+m.det+'</small></button>').join('')+
     '</div>'+
+    '<div class="camp"><label>Nota, opcional</label>'+
+    '<input type="text" id="mo-n" placeholder="pecho y tríceps"></div>'+
     '<div class="pbtns"><button class="btn" data-no>Cancelar</button></div>',
     {cerrarAlTocar:false,logro:!!repeticion});
   el.querySelectorAll('[data-mo]').forEach(b=>b.onclick=()=>{
     const m=def.modos.find(x=>x.k===b.dataset.mo);
-    cerrar(); cb({modo:m.k,nom:m.nom,exige:!!m.exige,marca:m.marca||null});
+    const nota=el.querySelector('#mo-n').value.trim();
+    cerrar(); cb({modo:m.k,nom:m.nom,exige:!!m.exige,marca:m.marca||null,nota:nota||null});
   });
   el.querySelector('[data-no]').onclick=()=>cerrar();
 }
@@ -3080,7 +3087,7 @@ q('#e-stats').addEventListener('click',e=>{
 });
 
 q('#e-guardapeso').onclick=()=>{
-  const v=parseFloat(q('#e-kg').value);
+  const v=num(q('#e-kg').value);
   if(isNaN(v)){q('#e-pesonota').textContent='Escribe un número para guardarlo.';return}
   const hoy=hoyLogico();
   D.dias[hoy]=D.dias[hoy]||{}; D.dias[hoy].peso=v;
@@ -3234,7 +3241,7 @@ function hojaCalorias(){
     '<input type="number" id="cdef" inputmode="numeric" step="50" value="'+
       (c.deficit==null?500:c.deficit)+'"></div>'+
     '<div class="camp"><label>Peso objetivo en kg · opcional</label>'+
-    '<input type="number" id="cpi" step="0.1" inputmode="decimal" value="'+(c.pesoIdeal||'')+'" placeholder="kg"></div>'+
+    '<input type="text" id="cpi" inputmode="text" value="'+(c.pesoIdeal||'')+'" placeholder="kg"></div>'+
     '<p class="nota" style="margin:-6px 0 12px">Al alcanzarlo, el déficit se apaga solo y la meta pasa a ser el mantenimiento.</p>'+
     '<div id="cres" class="nota" style="margin:-4px 0 12px"></div>'+
     '<div class="pbtns"><button class="btn" data-ok>Guardar</button></div>');
@@ -3260,7 +3267,7 @@ function hojaCalorias(){
       if(ps.length){mantE=Math.round(basal*act/10)*10; mantS=Math.round(basal*ACT_BASE/10)*10}
       else{mantE=c.valor||2050; mantS=c.valor||2050}
     }
-    const pi=parseFloat(el.querySelector('#cpi').value), p=pesoActual();
+    const pi=num(el.querySelector('#cpi').value), p=pesoActual();
     const parado=pi>0&&p!=null&&p<=pi;
     const meta=mm=>Math.round(Math.max(ps.length?basal:1200,mm-(parado?0:def))/10)*10;
     el.querySelector('#cres').innerHTML=mantE>0?
@@ -3283,7 +3290,7 @@ function hojaCalorias(){
     const m=el.querySelector('#cmodo').value;
     D.calorias.modo=m;
     D.calorias.deficit=Math.max(0,parseInt(el.querySelector('#cdef').value,10)||0);
-    const pi=parseFloat(el.querySelector('#cpi').value);
+    const pi=num(el.querySelector('#cpi').value);
     D.calorias.pesoIdeal=pi>0?pi:null;
     if(m==='manual'){
       const v=parseInt(el.querySelector('#cmanual').value,10);
@@ -3321,11 +3328,11 @@ function hojaPeso(){
       encolar(()=>{
         const e2=pop('<div class="ptit">'+c+'</div>'+
           '<div class="camp" style="margin-top:14px"><label>Peso corregido</label>'+
-          '<input type="number" id="pwx" step="0.1" inputmode="decimal" value="'+D.dias[c].peso+'"></div>'+
+          '<input type="text" id="pwx" inputmode="text" value="'+D.dias[c].peso+'"></div>'+
           '<div class="pbtns"><button class="btn" data-si>Guardar</button>'+
           '<button class="btn rojo" data-del>Borrar registro</button></div>',{cerrarAlTocar:false});
         e2.querySelector('[data-si]').onclick=()=>{
-          const v=parseFloat(e2.querySelector('#pwx').value);
+          const v=num(e2.querySelector('#pwx').value);
           if(!(v>=30&&v<=250)){e2.querySelector('#pwx').style.borderColor='var(--rojo)';return}
           cerrar(); D.dias[c].peso=v; guardar(); refrescar(); encolar(hojaPeso);
         };
@@ -3511,7 +3518,7 @@ function formAlimento(id,volver){
       '<p class="nota" style="margin:12px 0 10px">Solo para líquidos, opcional: cuánto pesan 100 ml. '+
       'Si lo llenas, podrás registrarlo pesándolo en la balanza en vez de medirlo.</p>'+
       '<div class="camp"><label>Peso de 100 ml, en gramos</label>'+
-      '<input type="number" id="f-d" step="0.1" inputmode="decimal" value="'+(a.dens||'')+'" placeholder="agua = 100"></div>'+
+      '<input type="text" id="f-d" inputmode="text" value="'+(a.dens||'')+'" placeholder="agua = 100"></div>'+
     '</div>'+
     '<p class="nota" style="margin:12px 0 10px">Medida práctica, opcional: para registrar sin pesar.</p>'+
     '<div class="camp"><label>Nombre de la medida</label><input type="text" id="f-mn" placeholder="unidad, rebanada, taza…" value="'+((a.medida&&a.medida.nom)||'')+'"></div>'+
@@ -3534,7 +3541,7 @@ function formAlimento(id,volver){
       carb:parseFloat(el.querySelector('#f-c').value)||0,
       gras:parseFloat(el.querySelector('#f-f').value)||0,
       base:(a&&a.base)||false,
-      dens:(()=>{const v=parseFloat(el.querySelector('#f-d').value);
+      dens:(()=>{const v=num(el.querySelector('#f-d').value);
         return (el.querySelector('#f-u').value==='ml'&&v>0)?v:null})(),
       medida:(()=>{const mn=el.querySelector('#f-mn').value.trim(),
         mg=parseFloat(el.querySelector('#f-mg').value);
@@ -3598,7 +3605,7 @@ function formReceta(idArg,volver){
     '</select></div>'+
     '<div id="r-dens" style="display:'+(r.unidad==='ml'?'block':'none')+'">'+
       '<div class="camp"><label>Peso de 100 ml, en gramos · opcional</label>'+
-      '<input type="number" id="r-d" step="0.1" inputmode="decimal" value="'+(r.dens||'')+'" placeholder="agua = 100"></div>'+
+      '<input type="text" id="r-d" inputmode="text" value="'+(r.dens||'')+'" placeholder="agua = 100"></div>'+
       '<p class="nota" style="margin:-6px 0 12px">Si lo llenas podrás registrar esta receta pesándola en la balanza.</p>'+
     '</div>'+
     '<div class="camp"><label>Cantidad final ya preparada</label>'+
@@ -3615,7 +3622,7 @@ function formReceta(idArg,volver){
   el.querySelector('#r-pf').addEventListener('input',e=>{r.manual=true;r.pesoFinal=parseFloat(e.target.value)||0});
   el.querySelector('#r-u').addEventListener('change',e=>{r.unidad=e.target.value;
     el.querySelector('#r-dens').style.display=e.target.value==='ml'?'block':'none'});
-  el.querySelector('#r-d').addEventListener('input',e=>r.dens=parseFloat(e.target.value)||null);
+  el.querySelector('#r-d').addEventListener('input',e=>r.dens=num(e.target.value)||null);
   el.querySelector('#r-po').addEventListener('input',e=>r.porciones=parseInt(e.target.value,10)||0);
   el.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>{
     r.ing.splice(parseInt(b.dataset.q,10),1); cerrar(); encolar(()=>formReceta());
@@ -3664,12 +3671,12 @@ function formReceta(idArg,volver){
                 '<option value="m">'+md.nom+' ('+md.g+' '+u+')</option></select></div>':'')+
               '<div class="camp"'+(md?'':' style="margin-top:14px"')+'>'+
               '<label id="ilq">Cantidad en '+eng+'</label>'+
-              '<input type="number" id="ig" step="0.1" inputmode="decimal" value="100"></div>'+
+              '<input type="text" id="ig" inputmode="text" value="100"></div>'+
               '<div id="iprev" class="nota"></div>'+
               '<div class="pbtns"><button class="btn" data-ok>Añadir</button>'+
               '<button class="btn" data-no>Cancelar</button></div>',{cerrarAlTocar:false});
             const enMed=()=>md&&e3.querySelector('#imq').value==='m';
-            const cant=()=>parseFloat(e3.querySelector('#ig').value)||0;
+            const cant=()=>num(e3.querySelector('#ig').value)||0;
             const gr=()=>enMed()?cant()*md.g:cant();
             const prev=()=>{const g=gr(), n=nutreDe('a:'+aid,g);
               e3.querySelector('#iprev').innerHTML=n?
@@ -4386,8 +4393,11 @@ function hojaManual(){
     '<p class="eyebrow" style="margin-top:16px">Override · calistenia o gimnasio</p>'+
     '<p>Al marcar Override el Sistema pregunta cómo lo hiciste. En Calistenia cuentan las metas de siempre: da la XP, el punto de umbral y las esquirlas igual, pero no toca las calorías del día, porque unas flexiones y sentadillas no mueven el gasto. En Gimnasio, además de todo lo anterior, se da por cumplido Physical Protocol y sí suben las calorías del día, porque una sesión completa sí es un entrenamiento.</p>'+
     '<p>Si desmarcas un Override que se hizo en gimnasio, Physical Protocol se desmarca también, salvo que lo hubieras marcado tú por tu cuenta antes.</p>'+
+    '<p class="eyebrow" style="margin-top:16px">Decimales</p>'+
+    '<p>Todos los campos con decimales aceptan coma o punto, y abren el teclado normal. 1,5 y 1.5 valen lo mismo.</p>'+
     '<p class="eyebrow" style="margin-top:16px">Misiones con opciones</p>'+
     '<p>Fleet Footwork admite tres formas de cumplirse. Al marcarla el Sistema te pregunta cuál hiciste y guarda la elección con la meta de ese día congelada, así que en el historial verás no solo que la completaste sino qué hiciste: saltos de cuerda, trote o bici, y cuánto tocaba en ese momento. Si la repites, la segunda vez el selector sale en violeta, como el resto de repeticiones.</p>'+
+    '<p>Tanto el selector de Fleet Footwork como el de Override llevan un campo de nota opcional: series, distancia, grupo muscular, lo que quieras. Queda guardado junto a la misión en la ficha de ese día, sin afectar a nada del cálculo.</p>'+
     '<p>Lorekeeper pregunta qué libro leíste y de qué página a cuál. Te propone el último libro registrado para no reescribirlo, y calcula solo cuántas páginas fueron. Todo eso queda en la ficha de ese día.</p>'+
     '<p class="eyebrow" style="margin-top:16px">Historial · misiones</p>'+
     '<p>La tabla muestra dos columnas por misión: cuántas veces la cumpliste y cuántas la fallaste. Una misión solo suma fallo en un día que quedó incompleto: si llegaste al mínimo de la racha o el día estuvo escudado, nada cuenta en tu contra. Las opcionales suman cumplidas pero nunca falladas. Debajo van los parámetros de Sustenance Code con las mismas dos columnas, y al final el uso de las especiales.</p>'+
