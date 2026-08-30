@@ -415,6 +415,7 @@ button.lapiz.inerte{color:var(--gris);cursor:not-allowed}
 .mapa i.fd{background:var(--morado-luz)}
 .mapa i.tr{background:#c9a227}
 .mapa i.cc{background:var(--rojo)}
+.mapa i.sl{background:var(--cian)}
 .ley{display:flex;gap:12px;flex-wrap:wrap;font-family:var(--mono);font-size:10px;color:var(--tenue);margin-top:10px}
 .ley s{width:9px;height:9px;display:inline-block;margin-right:4px;text-decoration:none}
 .blq{font-family:var(--mono);font-size:12px;margin-bottom:14px}
@@ -514,6 +515,7 @@ button.lapiz.inerte{color:var(--gris);cursor:not-allowed}
     <div class="ley">
       <span><s style="background:var(--azul)"></s>cumplido</span>
       <span><s style="background:rgba(77,184,255,.35)"></s>parcial</span>
+      <span><s style="background:var(--cian)"></s>Shore Leave</span>
       <span><s style="background:var(--morado)"></s>Field Duty</span>
       <span><s style="background:#c9a227"></s>Triage</span>
       <span><s style="background:var(--rojo)"></s>Critical</span>
@@ -944,14 +946,15 @@ function hechasEn(clave){
 // Las misiones que no tocaban ese día no cuentan como falladas.
 function diaCumplido(clave){
   const d=diaDe(clave);
-  if(enCritical(clave)||d.triage||turnoEscuda(clave))return true;
+  if(enCritical(clave)||enLeave(clave)||d.triage||turnoEscuda(clave))return true;
   return hechasEn(clave)>=CFG.rachaMin[kMod(modoEn(clave))];
 }
 
 const CFG={costoNivel2:350,gMin:.03,gMax:.18,nivelCongela:40,crecMision:.10,
   esquirlasPorPunto:5,puntosPorBloque:4,excedentesConXP:3,factorExcedente:.40,
   rachaMin:{vac:4,ciclo:3},bonusAtonement:15,topeINTturno:6,diasBloque:28,
-  triageSeguidos:3,triageSemana:3,triageBloque:10,criticalDias:10,criticalAnio:2,atonementSemana:2};
+  triageSeguidos:3,triageSemana:3,triageBloque:10,criticalDias:10,criticalAnio:2,atonementSemana:2,
+  leaveAnio:28};
 const RANGOS=[[150,"S"],[114,"A"],[65,"B"],[41,"C"],[16,"D"],[1,"E"]];
 const LLAMA=[[100,"#38f0ff"],[50,"#ff5c6a"],[21,"#ff9040"],[7,"#ffb547"],[1,"#78838f"]];
 
@@ -1004,7 +1007,7 @@ let D=null, R=null;
 function estadoNuevo(){
   let ini=hoyLogico();
   if(!esLunes(ini)) ini=lunesDe(ini);
-  return {v:1,jugador:"Mennydorges",inicio:ini,arranque:hoyLogico(),dias:{},semanas:{},criticals:[],
+  return {v:1,jugador:"Mennydorges",inicio:ini,arranque:hoyLogico(),dias:{},semanas:{},criticals:[],leaves:[],
     cambiosModo:[{fecha:ini,modo:"vacaciones"}],asignaciones:[],
     misionesOff:[],misiones:{},borradas:[],cuotas:{},techos:{},nutri:{},
     calorias:{modo:"formula",valor:2050,manual:null},
@@ -1037,6 +1040,12 @@ function modoEn(clave){let mo="vacaciones";for(const c of D.cambiosModo){if(dif(
 const diaDe=c=>D.dias[c]||{};
 const veces=(c,id)=>id==='comida'?(comidaCumplida(c)?1:0):(((diaDe(c).m)||{})[id]||0);
 const enCritical=c=>D.criticals.some(x=>dif(x.desde,c)>=0&&dif(c,x.hasta)>=0);
+// Shore Leave: descanso planificado. Escuda igual que Critical Condition,
+// pero se pide por adelantado y hay 28 días al año, como unas vacaciones.
+const enLeave=c=>(D.leaves||[]).some(x=>dif(x.desde,c)>=0&&dif(c,x.hasta)>=0);
+const diasLeave=anio=>(D.leaves||[])
+  .filter(x=>x.desde.slice(0,4)===anio)
+  .reduce((a,x)=>a+dif(x.desde,x.hasta)+1,0);
 // Field Duty escuda el día entero solo si el turno fue largo.
 // En vacaciones hacen falta 12 horas; en ciclo cualquier turno escuda,
 // porque esas horas son todo el tiempo libre del día.
@@ -1122,7 +1131,7 @@ function calcular(hasta){
     }return null;
   }
   function cubiertos(semKey){let n=0;for(let j=0;j<7;j++){const c=sumar(semKey,j);const d=diaDe(c);
-    if(d.triage||turnoEscuda(c)||enCritical(c))n++}return n}
+    if(d.triage||turnoEscuda(c)||enCritical(c)||enLeave(c))n++}return n}
   function cuotaEf(ref,semKey){let c=ref.cuota;
     const s=D.semanas[semKey]||{};
     if(ref.sid)for(const a of (s.atonement||[]))if(a.mision===ref.sid)c++;
@@ -1154,7 +1163,7 @@ function calcular(hasta){
     const d=diaDe(clave);
     const crit=enCritical(clave);
     const preArr=dif(D.arranque||D.inicio,clave)<0;
-    const escudo=crit||d.triage||turnoEscuda(clave)||preArr;
+    const escudo=crit||enLeave(clave)||d.triage||turnoEscuda(clave)||preArr;
     const mult=multMision(nivel);
     const semKey=lunesDe(clave);
     contSem[semKey]=contSem[semKey]||{};
@@ -1243,7 +1252,7 @@ function calcular(hasta){
     const sem=D.semanas[semKey]||{};
     const cu=cubiertos(semKey);
     const res={semana:semKey,misiones:[]};
-    const hayCrit=[0,1,2,3,4,5,6].some(j=>enCritical(sumar(semKey,j)))
+    const hayCrit=[0,1,2,3,4,5,6].some(j=>enCritical(sumar(semKey,j))||enLeave(sumar(semKey,j)))
       ||dif(D.arranque||D.inicio,semKey)>0;   // semana anterior al arranque real
     const trCancela=[0,1,2,3,4,5,6].some(j=>diaDe(sumar(semKey,j)).triage);
 
@@ -1303,7 +1312,7 @@ function calcular(hasta){
 
   function cerrarBloque(clave,modo){
     const ini=sumar(clave,-CFG.diasBloque);
-    let cub=0;for(let j=0;j<CFG.diasBloque;j++)if(enCritical(sumar(ini,j)))cub++;
+    let cub=0;for(let j=0;j<CFG.diasBloque;j++)if(enCritical(sumar(ini,j))||enLeave(sumar(ini,j)))cub++;
     let pro=conval?0.7:null;
     if(cub>0)pro=(CFG.diasBloque-cub)/CFG.diasBloque*(pro||1);
     const det={n:bIdx,desde:ini,hasta:clave,stats:{}};
@@ -2313,6 +2322,11 @@ function pintarMisiones(){
        'Registra tus horas de turno. Desde '+HORAS_ESCUDO+' h el día queda escudado.'),!!d.turno)+
     esp('atonement','Atonement','Sube en 1 una cuota semanal.',(sem.atonement||[]).length>0)+
     esp('triage','Triage','Marca el día como enfermedad.',!!d.triage)+
+    esp('leave','Shore Leave',(()=>{
+      const usados=diasLeave(hoy.slice(0,4));
+      return enLeave(hoy)?'De descanso · '+(CFG.leaveAnio-usados)+' días libres este año'
+        :'Descanso planificado. Te quedan '+(CFG.leaveAnio-usados)+' de '+CFG.leaveAnio+' días.';
+    })(),enLeave(hoy))+
     esp('critical','Critical Condition','Suspende el Sistema por enfermedad grave.',cc);
 }
 const esp=(id,nom,desc,on)=>'<button class="esp'+(on?' on':'')+'" data-e="'+id+'">'+nom+'<small>'+desc+'</small></button>';
@@ -2604,10 +2618,11 @@ function hojaDia(clave){
   const [aa,mm2,dd2]=clave.split('-').map(Number);
   const DOW=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
   const tit=DOW[dow(clave)]+' '+dd2+' '+MESES[mm2-1];
-  const crit=enCritical(clave), esc=crit||d.triage||turnoEscuda(clave);
+  const crit=enCritical(clave), esc=crit||enLeave(clave)||d.triage||turnoEscuda(clave);
   const n=hechasEn(clave), minR=CFG.rachaMin[m];
   let estado, col;
   if(crit){estado='Critical Condition';col='var(--rojo)'}
+  else if(enLeave(clave)){estado='Shore Leave';col='var(--cian)'}
   else if(d.triage){estado='Triage';col='var(--morado-luz)'}
   else if(turnoEscuda(clave)){estado='Field Duty · día escudado';col='var(--morado-luz)'}
   else if(n>=minR){estado='Día cumplido · '+n+' de '+minR+' mínimas';col='var(--cian)'}
@@ -2681,7 +2696,7 @@ function pintarHistorial(){
       if(dif(D.inicio,c)<0||dif(c,hoy)<0){fila+='<i style="opacity:.25"></i>';continue}
       const dd=diaDe(c);
       let cl='';
-      if(enCritical(c))cl='cc'; else if(dd.triage)cl='tr'; else if(dd.turno>0)cl='fd';
+      if(enCritical(c))cl='cc'; else if(enLeave(c))cl='sl'; else if(dd.triage)cl='tr'; else if(dd.turno>0)cl='fd';
       else{const n=hechasEn(c);
         cl=n>=CFG.rachaMin[kMod(modoEn(c))]?'ok':n>0?'med':''}
       fila+='<i class="'+cl+'" data-dia="'+c+'"></i>';
@@ -2748,6 +2763,8 @@ function pintarHistorial(){
   if(esp.triage)fesp.push(['Triage',esp.triage+(esp.triage===1?' día':' días')]);
   if(esp.aton)fesp.push(['Atonement',esp.aton+(esp.aton===1?' vez':' veces')]);
   if(esp.cc)fesp.push(['Critical Condition',esp.cc+(esp.cc===1?' día':' días')]);
+  const slAnio=diasLeave(hoy.slice(0,4));
+  fesp.push(['Shore Leave',slAnio+' de '+CFG.leaveAnio+' días usados este año']);
   q('#h-fallos').innerHTML+='<p class="eyebrow" style="margin-top:16px">Especiales</p>'+
     (fesp.length?fesp.map(([n,v])=>'<div class="sem"><span>'+n+'</span><b style="margin-left:auto">'+v+'</b></div>').join('')
      :'<p class="nota" style="margin:0">Todavía no has usado ninguna.</p>');
@@ -3044,6 +3061,62 @@ function especial(id,saltarGuardia){
     if(bloque>=CFG.triageBloque){aviso('Triage','<div class="ptxt">Ya usaste las 10 de este bloque.</div>',false,'error');return}
     confirmar('Triage','El día no rompe la racha ni penaliza.',()=>{
       D.dias[hoy]=D.dias[hoy]||{}; D.dias[hoy].triage=true; guardar(); refrescar()},true);
+  }
+  if(id==='leave'){
+    const anio=hoy.slice(0,4), usados=diasLeave(anio), libres=CFG.leaveAnio-usados;
+    // cancelar el descanso en curso
+    const actual=(D.leaves||[]).find(x=>dif(x.desde,hoy)>=0&&dif(hoy,x.hasta)>=0);
+    if(actual){
+      confirmar('Shore Leave','Del '+fechaCorta(actual.desde)+' al '+fechaCorta(actual.hasta)+
+        '. ¿Cancelarlo? Los días vuelven a tu bolsa.',()=>{
+        D.leaves=D.leaves.filter(x=>x!==actual); guardar(); refrescar()},true);
+      return;
+    }
+    if(libres<=0){
+      aviso('Shore Leave','<div class="ptxt">Ya gastaste los '+CFG.leaveAnio+
+        ' días de este año.</div>',false,'error');return;
+    }
+    confirmar('Shore Leave','Días de descanso planificado: la racha se congela y nada penaliza. '+
+      'Te quedan '+libres+' de '+CFG.leaveAnio+' este año.',()=>{
+      encolar(()=>{
+        const el=pop('<div class="ptit">Shore Leave</div>'+
+          '<div class="camp" style="text-align:left;margin-top:14px"><label>Desde</label>'+
+          '<input type="text" id="sl-d" value="'+hoy+'"></div>'+
+          '<div class="camp" style="text-align:left"><label>Hasta</label>'+
+          '<input type="text" id="sl-h" value="'+hoy+'"></div>'+
+          '<div class="camp" style="text-align:left"><label>Motivo, opcional</label>'+
+          '<input type="text" id="sl-m" placeholder="Viaje, feriados…"></div>'+
+          '<div id="sl-r" class="nota"></div>'+
+          '<div class="pbtns"><button class="btn" data-no>Cancelar</button>'+
+          '<button class="btn" data-si>Activar</button></div>',{cerrarAlTocar:false});
+        const prev=()=>{
+          const de=el.querySelector('#sl-d').value.trim(),a=el.querySelector('#sl-h').value.trim();
+          const ok=/^\d{4}-\d{2}-\d{2}$/.test(de)&&/^\d{4}-\d{2}-\d{2}$/.test(a)&&dif(de,a)>=0;
+          const n=ok?dif(de,a)+1:0;
+          el.querySelector('#sl-r').textContent=ok?
+            n+(n===1?' día':' días')+' · te quedarían '+(libres-n):'';
+        };
+        ['#sl-d','#sl-h'].forEach(x=>el.querySelector(x).addEventListener('input',prev));
+        prev();
+        el.querySelector('[data-no]').onclick=cerrar;
+        el.querySelector('[data-si]').onclick=()=>{
+          const de=el.querySelector('#sl-d').value.trim(),a=el.querySelector('#sl-h').value.trim();
+          const mo=el.querySelector('#sl-m').value.trim();
+          if(!/^\d{4}-\d{2}-\d{2}$/.test(de)||!/^\d{4}-\d{2}-\d{2}$/.test(a)||dif(de,a)<0){
+            el.querySelector('#sl-d').style.borderColor='var(--rojo)';return}
+          const n=dif(de,a)+1;
+          if(n>libres){cerrar();
+            aviso('Shore Leave','<div class="ptxt">Son '+n+' días y solo te quedan '+libres+
+              '.</div>',false,'error');return}
+          if((D.leaves||[]).some(x=>dif(x.desde,a)>=0&&dif(de,x.hasta)>=0)){
+            cerrar();aviso('Shore Leave','<div class="ptxt">Se cruza con otro descanso ya registrado.</div>',
+              false,'error');return}
+          cerrar();
+          D.leaves.push({desde:de,hasta:a,motivo:mo||null});
+          guardar(); refrescar();
+        };
+      });
+    },true);
   }
   if(id==='critical'){
     confirmar('Critical Condition','Suspende el Sistema hasta 10 días. Solo 2 por año.',()=>{
@@ -3989,6 +4062,7 @@ function hojaRegistro(){
     const d=diaDe(c), n=hechasEn(c), minR=CFG.rachaMin[kMod(modoEn(c))];
     let et,col;
     if(enCritical(c)){et='Critical Condition';col='var(--rojo)'}
+    else if(enLeave(c)){et='Shore Leave';col='var(--cian)'}
     else if(d.triage){et='Triage';col='var(--morado-luz)'}
     else if(turnoEscuda(c)){et=d.turno+' h de turno';col='var(--morado-luz)'}
     else if(n>=minR){et=n+' misiones';col='var(--cian)'}
@@ -4407,6 +4481,9 @@ function hojaManual(){
     '<p>Hay 115 logros escondidos, calibrados para 2 años de uso. No dan XP ni puntos: dan un título. Se desbloquean solos al cumplir su condición y recién ahí el Sistema te dice cuál era. Cubren niveles, rangos, racha, XP, atributos, esquirlas, repeticiones de cada misión, semanas y bloques cumplidos, Field Duty, Atonement, peso, metas progresivas llevadas al techo y tiempo dentro del Sistema. Triage y Critical Condition no dan ninguno.</p>'+
     '<p>Hay 3 dificultades y el color del título las distingue: gris azulado para los triviales, cian para los exigentes y violeta para los difíciles.</p>'+
     '<p>En Ajustes › Logros están todos: los conseguidos aparecen primero con su fecha, los que faltan salen como ???. Toca un logro conseguido para llevar su título bajo tu nombre en Estado, y tócalo otra vez para quitarlo.</p>'+
+    '<p class="eyebrow" style="margin-top:16px">Shore Leave</p>'+
+    '<p>Descanso planificado, con 28 días al año como las vacaciones de un trabajo. Eliges fecha de inicio y de fin, y esos días quedan escudados: la racha se congela, ninguna misión cuenta como fallada y el bloque no aplica decaimiento por la parte cubierta. Puedes partirlos como quieras, de un día suelto a dos semanas seguidas, hasta agotar los 28. En el mapa del historial salen en cian.</p>'+
+    '<p>Si cancelas un descanso en curso, los días vuelven a tu bolsa. Los días se cuentan por el año de la fecha de inicio, y el contador se reinicia en enero.</p>'+
     '<p class="eyebrow" style="margin-top:16px">Field Duty</p><p>Cada 12 horas de turno dan 1 punto directo de INT y cada 4 horas sueltas 1 esquirla, con tope de 6 puntos por bloque. Las horas ya convertidas en punto no vuelven a dar esquirlas.</p>'+
     '<p>El escudo del día depende del modo. En vacaciones hace falta un turno de 12 horas o más para que el día quede escudado: un turno corto sigue dando XP, puntos y esquirlas, pero las demás misiones se exigen igual, porque te queda día por delante. En ciclo cualquier turno escuda, aunque sean 3 o 4 horas, porque esas horas son el tiempo libre que tienes.</p>'+
     '<p>Lorekeeper es diaria en vacaciones y opcional durante el ciclo: sigue dando XP y esquirlas de INT, pero no cuenta para la racha ni penaliza si no lees. En ciclo, Weekly Codex solo mide Scholar\'s Focus.</p>'+
@@ -4449,6 +4526,7 @@ q('#archivo').addEventListener('change',e=>{
       if(!D.misiones)D.misiones={};
       if(!D.borradas)D.borradas=[];
       if(!D.logros)D.logros={};
+      if(!D.leaves)D.leaves=[];
       nutriInit();                 // respaldos anteriores al módulo de comida
       reconstruirCatalogo();
       guardar(); refrescar();
@@ -4468,6 +4546,7 @@ q('#archivo').addEventListener('change',e=>{
   if(!D.misiones)D.misiones={};
   if(!D.borradas)D.borradas=[];
   if(!D.logros)D.logros={};
+  if(!D.leaves)D.leaves=[];
   nutriInit();
   reconstruirCatalogo();
   refrescar();
