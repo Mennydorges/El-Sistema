@@ -20,6 +20,7 @@
   --morado:#5F249F;
   --morado-luz:#a86ce0;
   --linea:rgba(77,184,255,.30);
+  --sl:#00965e;
   --texto:#cfe6ff;
   --tenue:#6f8bb0;
   --gris:#3d4f68;
@@ -185,6 +186,7 @@ body{
 .esp small{display:block;font-family:system-ui;font-size:12.5px;letter-spacing:0;text-transform:none;
   color:var(--tenue);margin-top:3px}
 .esp.on{border-color:var(--morado-luz);color:var(--morado-luz)}
+.esp[data-e="leave"].on{border-color:var(--sl);color:var(--sl)}
 
 /* ---------- botones / campos ---------- */
 .btn{background:rgba(77,184,255,.09);border:1px solid var(--azul);color:var(--azul-claro);
@@ -415,7 +417,7 @@ button.lapiz.inerte{color:var(--gris);cursor:not-allowed}
 .mapa i.fd{background:var(--morado-luz)}
 .mapa i.tr{background:#c9a227}
 .mapa i.cc{background:var(--rojo)}
-.mapa i.sl{background:var(--cian)}
+.mapa i.sl{background:var(--sl)}
 .ley{display:flex;gap:12px;flex-wrap:wrap;font-family:var(--mono);font-size:10px;color:var(--tenue);margin-top:10px}
 .ley s{width:9px;height:9px;display:inline-block;margin-right:4px;text-decoration:none}
 .blq{font-family:var(--mono);font-size:12px;margin-bottom:14px}
@@ -515,7 +517,7 @@ button.lapiz.inerte{color:var(--gris);cursor:not-allowed}
     <div class="ley">
       <span><s style="background:var(--azul)"></s>cumplido</span>
       <span><s style="background:rgba(77,184,255,.35)"></s>parcial</span>
-      <span><s style="background:var(--cian)"></s>Shore Leave</span>
+      <span><s style="background:var(--sl)"></s>Shore Leave</span>
       <span><s style="background:var(--morado)"></s>Field Duty</span>
       <span><s style="background:#c9a227"></s>Triage</span>
       <span><s style="background:var(--rojo)"></s>Critical</span>
@@ -1253,7 +1255,7 @@ function calcular(hasta){
     const cu=cubiertos(semKey);
     const res={semana:semKey,misiones:[]};
     const hayCrit=[0,1,2,3,4,5,6].some(j=>enCritical(sumar(semKey,j))||enLeave(sumar(semKey,j)))
-      ||dif(D.arranque||D.inicio,semKey)>0;   // semana anterior al arranque real
+      ||dif(D.arranque||D.inicio,semKey)<0;   // semana anterior al arranque real
     const trCancela=[0,1,2,3,4,5,6].some(j=>diaDe(sumar(semKey,j)).triage);
 
     for(const id of (sem.manuales||[])){
@@ -1312,7 +1314,7 @@ function calcular(hasta){
 
   function cerrarBloque(clave,modo){
     const ini=sumar(clave,-CFG.diasBloque);
-    let cub=0;for(let j=0;j<CFG.diasBloque;j++)if(enCritical(sumar(ini,j))||enLeave(sumar(ini,j)))cub++;
+    let cub=0;for(let j=0;j<CFG.diasBloque;j++)if(enCritical(sumar(ini,j)))cub++;
     let pro=conval?0.7:null;
     if(cub>0)pro=(CFG.diasBloque-cub)/CFG.diasBloque*(pro||1);
     const det={n:bIdx,desde:ini,hasta:clave,stats:{}};
@@ -2622,7 +2624,7 @@ function hojaDia(clave){
   const n=hechasEn(clave), minR=CFG.rachaMin[m];
   let estado, col;
   if(crit){estado='Critical Condition';col='var(--rojo)'}
-  else if(enLeave(clave)){estado='Shore Leave';col='var(--cian)'}
+  else if(enLeave(clave)){estado='Shore Leave';col='var(--sl)'}
   else if(d.triage){estado='Triage';col='var(--morado-luz)'}
   else if(turnoEscuda(clave)){estado='Field Duty · día escudado';col='var(--morado-luz)'}
   else if(n>=minR){estado='Día cumplido · '+n+' de '+minR+' mínimas';col='var(--cian)'}
@@ -4062,7 +4064,7 @@ function hojaRegistro(){
     const d=diaDe(c), n=hechasEn(c), minR=CFG.rachaMin[kMod(modoEn(c))];
     let et,col;
     if(enCritical(c)){et='Critical Condition';col='var(--rojo)'}
-    else if(enLeave(c)){et='Shore Leave';col='var(--cian)'}
+    else if(enLeave(c)){et='Shore Leave';col='var(--sl)'}
     else if(d.triage){et='Triage';col='var(--morado-luz)'}
     else if(turnoEscuda(c)){et=d.turno+' h de turno';col='var(--morado-luz)'}
     else if(n>=minR){et=n+' misiones';col='var(--cian)'}
@@ -4482,7 +4484,7 @@ function hojaManual(){
     '<p>Hay 3 dificultades y el color del título las distingue: gris azulado para los triviales, cian para los exigentes y violeta para los difíciles.</p>'+
     '<p>En Ajustes › Logros están todos: los conseguidos aparecen primero con su fecha, los que faltan salen como ???. Toca un logro conseguido para llevar su título bajo tu nombre en Estado, y tócalo otra vez para quitarlo.</p>'+
     '<p class="eyebrow" style="margin-top:16px">Shore Leave</p>'+
-    '<p>Descanso planificado, con 28 días al año como las vacaciones de un trabajo. Eliges fecha de inicio y de fin, y esos días quedan escudados: la racha se congela, ninguna misión cuenta como fallada y el bloque no aplica decaimiento por la parte cubierta. Puedes partirlos como quieras, de un día suelto a dos semanas seguidas, hasta agotar los 28. En el mapa del historial salen en cian.</p>'+
+    '<p>Descanso planificado, con 28 días al año como las vacaciones de un trabajo. Eliges fecha de inicio y de fin, y esos días protegen la racha exactamente igual que Triage: no cuentan en tu contra y el mínimo diario no se les exige. No otorgan nada por sí solos: las misiones semanales automáticas siguen evaluándose con normalidad, y si no las completas, fallan igual que cualquier otra semana. Puedes partirlos como quieras, de un día suelto a dos semanas seguidas, hasta agotar los 28. En el mapa del historial salen en cian.</p>'+
     '<p>Si cancelas un descanso en curso, los días vuelven a tu bolsa. Los días se cuentan por el año de la fecha de inicio, y el contador se reinicia en enero.</p>'+
     '<p class="eyebrow" style="margin-top:16px">Field Duty</p><p>Cada 12 horas de turno dan 1 punto directo de INT y cada 4 horas sueltas 1 esquirla, con tope de 6 puntos por bloque. Las horas ya convertidas en punto no vuelven a dar esquirlas.</p>'+
     '<p>El escudo del día depende del modo. En vacaciones hace falta un turno de 12 horas o más para que el día quede escudado: un turno corto sigue dando XP, puntos y esquirlas, pero las demás misiones se exigen igual, porque te queda día por delante. En ciclo cualquier turno escuda, aunque sean 3 o 4 horas, porque esas horas son el tiempo libre que tienes.</p>'+
