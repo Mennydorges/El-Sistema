@@ -1133,7 +1133,7 @@ function calcular(hasta){
     }return null;
   }
   function cubiertos(semKey){let n=0;for(let j=0;j<7;j++){const c=sumar(semKey,j);const d=diaDe(c);
-    if(d.triage||turnoEscuda(c)||enCritical(c)||enLeave(c))n++}return n}
+    if(d.triage||turnoEscuda(c)||enCritical(c))n++}return n}
   function cuotaEf(ref,semKey){let c=ref.cuota;
     const s=D.semanas[semKey]||{};
     if(ref.sid)for(const a of (s.atonement||[]))if(a.mision===ref.sid)c++;
@@ -4484,7 +4484,7 @@ function hojaManual(){
     '<p>Hay 3 dificultades y el color del título las distingue: gris azulado para los triviales, cian para los exigentes y violeta para los difíciles.</p>'+
     '<p>En Ajustes › Logros están todos: los conseguidos aparecen primero con su fecha, los que faltan salen como ???. Toca un logro conseguido para llevar su título bajo tu nombre en Estado, y tócalo otra vez para quitarlo.</p>'+
     '<p class="eyebrow" style="margin-top:16px">Shore Leave</p>'+
-    '<p>Descanso planificado, con 28 días al año como las vacaciones de un trabajo. Eliges fecha de inicio y de fin, y esos días protegen la racha exactamente igual que Triage: no cuentan en tu contra y el mínimo diario no se les exige. No otorgan nada por sí solos: las misiones semanales automáticas siguen evaluándose con normalidad, y si no las completas, fallan igual que cualquier otra semana. Puedes partirlos como quieras, de un día suelto a dos semanas seguidas, hasta agotar los 28. En el mapa del historial salen en cian.</p>'+
+    '<p>Descanso planificado, con 28 días al año como las vacaciones de un trabajo. Eliges fecha de inicio y de fin, y esos días protegen la racha: no cuentan en tu contra y el mínimo diario no se les exige. Si esa semana no llegas a cumplir las semanales automáticas, se perdona sin quitarte XP. Pero no baja lo que te piden esos días, a diferencia de Triage: si trabajas con normalidad, la meta sigue siendo la de siempre, así que no vas a ver esquirlas de excedente por una meta artificialmente más baja. Puedes partirlos como quieras, de un día suelto a dos semanas seguidas, hasta agotar los 28. En el mapa del historial salen en el verde de Shore Leave.</p>'+
     '<p>Si cancelas un descanso en curso, los días vuelven a tu bolsa. Los días se cuentan por el año de la fecha de inicio, y el contador se reinicia en enero.</p>'+
     '<p class="eyebrow" style="margin-top:16px">Field Duty</p><p>Cada 12 horas de turno dan 1 punto directo de INT y cada 4 horas sueltas 1 esquirla, con tope de 6 puntos por bloque. Las horas ya convertidas en punto no vuelven a dar esquirlas.</p>'+
     '<p>El escudo del día depende del modo. En vacaciones hace falta un turno de 12 horas o más para que el día quede escudado: un turno corto sigue dando XP, puntos y esquirlas, pero las demás misiones se exigen igual, porque te queda día por delante. En ciclo cualquier turno escuda, aunque sean 3 o 4 horas, porque esas horas son el tiempo libre que tienes.</p>'+
