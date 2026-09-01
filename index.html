@@ -1025,12 +1025,16 @@ const Store={
     try{localStorage.setItem(CLAVE,v);return true}catch(e){return false}
   }
 };
-let guardando=false;
+let guardando=false,guardarPendiente=false;
 async function guardar(){
-  if(guardando)return; guardando=true;
+  // si ya hay un guardado en curso, no se pierde: se encola uno más
+  // para justo después, en vez de descartarlo en silencio
+  if(guardando){guardarPendiente=true;return}
+  guardando=true;
   const ok=await Store.escribir(JSON.stringify(D));
   guardando=false;
   if(!ok)q('#a-resp').textContent="No se pudo guardar en este navegador. Exporta un respaldo antes de cerrar.";
+  if(guardarPendiente){guardarPendiente=false;guardar()}
 }
 
 /* ==========================================================
@@ -1667,8 +1671,8 @@ function sacudirSistema(sinFlash){
   });
   if(!sinFlash)flashRojo();
 }
-function aviso(titulo,cuerpo,logro,son){
-  encolar(()=>{pop('<div class="ptit">'+titulo+'</div>'+cuerpo,{logro:!!logro,sonido:son})});
+function aviso(titulo,cuerpo,logro,son,rojo){
+  encolar(()=>{pop('<div class="ptit">'+titulo+'</div>'+cuerpo,{logro:!!logro,sonido:son,rojo:!!rojo})});
 }
 function confirmar(nombre,texto,onSi,rojo){
   encolar(()=>{
@@ -1701,26 +1705,31 @@ function popNivel(n){
   aviso('Subiste de nivel',
     '<div class="pbig">'+(n-1)+' → '+n+'</div><div class="ptxt">+1 punto libre</div>',true,'nivel');
 }
-function popXP(antes,despues,esExc){
-  const dif=despues.xp-antes.xp;
+// Versión genérica: recibe XP cruda antes/después (no un estado R completo),
+// para poder mostrar una barra por CADA misión semanal por separado, con su
+// propio cruce de nivel en medio, en vez de un único salto agregado.
+function mostrarXP(xpAntes,xpDespues,col,esExc){
+  const dif=xpDespues-xpAntes;
   if(!dif)return;
-  const col=dif<0?'var(--rojo)':(esExc?'var(--morado-luz)':'var(--cian)');
+  const A=nivelDesde(xpAntes),B=nivelDesde(xpDespues);
   const pct=(d,n)=>Math.round(d/n*100);
-  if(despues.nivel<=antes.nivel){
-    barraXP(despues.nivel,pct(antes.dentro,antes.necesita),pct(despues.dentro,despues.necesita),
-      despues.dentro,despues.necesita,dif,col,esExc);
+  if(B.nivel<=A.nivel){
+    barraXP(B.nivel,pct(A.dentro,A.necesita),pct(B.dentro,B.necesita),B.dentro,B.necesita,dif,col,esExc);
     return;
   }
   // Cruzó uno o varios niveles: una barra por nivel, con su aviso en medio.
-  barraXP(antes.nivel,pct(antes.dentro,antes.necesita),100,antes.necesita,antes.necesita,null,col,esExc);
-  popNivel(antes.nivel+1);
-  for(let n=antes.nivel+1;n<despues.nivel;n++){
+  barraXP(A.nivel,pct(A.dentro,A.necesita),100,A.necesita,A.necesita,null,col,esExc);
+  popNivel(A.nivel+1);
+  for(let n=A.nivel+1;n<B.nivel;n++){
     const c=costoNivel(n);
     barraXP(n,0,100,c,c,null,col,esExc);
     popNivel(n+1);
   }
-  barraXP(despues.nivel,0,pct(despues.dentro,despues.necesita),
-    despues.dentro,despues.necesita,dif,col,esExc);
+  barraXP(B.nivel,0,pct(B.dentro,B.necesita),B.dentro,B.necesita,dif,col,esExc);
+}
+function popXP(desde,hasta,esExc){
+  const dif=hasta-desde;
+  mostrarXP(desde,hasta,dif<0?'var(--rojo)':(esExc?'var(--morado-luz)':'var(--cian)'),esExc);
 }
 // Firma de un evento: dos eventos con la misma firma son el mismo suceso.
 // Hace falta porque la lista se recalcula entera cada vez y un evento nuevo
@@ -1746,7 +1755,26 @@ function anunciar(antes,despues){
   const nuevos=eventosNuevos(antes,despues);
   const porTipo={};
   for(const e of nuevos)(porTipo[e.t]=porTipo[e.t]||[]).push(e);
-  popXP(antes,despues,(porTipo.excedente||[]).length>0);
+
+  // Cierre de semana: una misión a la vez — su propio aviso de completada/fallada
+  // y su propia barra de XP, con el aviso de nivel intercalado si corresponde,
+  // en vez de un salto agregado de golpe.
+  let cursor=antes.xp;
+  if(despues.semanas.length>antes.semanas.length){
+    const s=despues.semanas[despues.semanas.length-1];
+    for(const m of s.misiones){
+      const S=SW[m.id]||SEMANALES[m.id];
+      aviso(m.ok?'Misión cumplida':'Misión fallida',
+        '<div class="pbig">'+S.nom+'</div>'+
+        '<div class="ptxt" style="margin-top:6px">Recompensa: '+(m.xp>=0?'+':'')+m.xp+' XP</div>',
+        m.ok,m.ok?'mision':'error',!m.ok);
+      const desde=cursor,hasta=cursor+m.xp;
+      mostrarXP(desde,hasta,m.ok?'var(--cian)':'var(--rojo)',false);
+      cursor=hasta;
+    }
+  }
+  // el resto de la XP (misiones normales del día, etc.), si queda algo por mostrar
+  popXP(cursor,despues.xp,(porTipo.excedente||[]).length>0);
 
   const esqLibres=(porTipo.esquirla||[]).slice();
   for(const e of (porTipo.excedente||[])){
@@ -1794,12 +1822,6 @@ function anunciar(antes,despues){
       '<div class="ptxt" style="margin-top:8px;color:var(--tenue)">'+
       (dr==null?'Todavía no has exportado ninguno.':'El último fue hace '+dr+' día'+(dr===1?'':'s')+'.')+
       '</div>',false,'sistema');
-  }
-  if(despues.semanas.length>antes.semanas.length){
-    const s=despues.semanas[despues.semanas.length-1];
-    let f='';for(const m of s.misiones)f+='<div><span>'+SEMANALES[m.id].nom+'</span><span class="'+
-      (m.ok?'':'r')+'">'+(m.ok?'✓ +':'✗ ')+m.xp+' XP</span></div>';
-    aviso('Semana cerrada','<div class="pfilas">'+f+'</div>',false,s.misiones.some(m=>m.ok)?'mision':'sistema');
   }
 }
 function asignarPunto(){
@@ -1899,7 +1921,10 @@ function pedirPeso(){
   });
 }
 function refrescar(anunciando){
-  const antes=R;
+  // en frío (recién abierta la app) R todavía no existe: se usa el último
+  // estado visto que quedó guardado la sesión anterior, para poder anunciar
+  // lo que pasó mientras la app estuvo cerrada (p.ej. el cierre de semana)
+  const antes=R||D.ultimoVisto||null;
   nutriInit();          // los genéricos se resiembran siempre
   reconstruirCatalogo();
   R=calcular();
@@ -1911,6 +1936,7 @@ function refrescar(anunciando){
   if(arranqueHecho)lgNuevos.forEach(avisarLogro);
   pedirBienvenida();
   pedirPeso();      // la cola las muestra en orden: nombre y luego peso
+  D.ultimoVisto=R; guardar();   // deja rastro de lo último visto, para el próximo arranque en frío
 }
 function colorLlama(n){for(const[m,c]of LLAMA)if(n>=m)return c;return'#2b3a4f'}
 function svgLlama(n){
@@ -2705,8 +2731,9 @@ function pintarHistorial(){
     }
     semanas.push(fila);
   }
-  // la semana más reciente arriba
-  q('#h-mapa').innerHTML=semanas.reverse().join('');
+  // orden cronológico: la semana más antigua arriba, la actual abajo,
+  // así lo que se completa no se desplaza — la fila de abajo sigue llenándose
+  q('#h-mapa').innerHTML=semanas.join('');
   q('#h-mapa').onclick=e=>{const i=e.target.closest('[data-dia]'); if(i)hojaDia(i.dataset.dia)};
 
   q('#h-bloques').innerHTML=R.bloques.length?R.bloques.slice().reverse().map(b=>
@@ -4551,7 +4578,7 @@ q('#archivo').addEventListener('change',e=>{
   if(!D.leaves)D.leaves=[];
   nutriInit();
   reconstruirCatalogo();
-  refrescar();
+  refrescar(true);   // anuncia lo que haya pasado mientras la app estuvo cerrada
   arranqueHecho=true;   // a partir de aquí, todo logro nuevo se anuncia
   swInit();
   let ultimo=hoyLogico();
