@@ -2572,7 +2572,9 @@ function cantidadComida(cat,ref,volver){
   const hHoy=String(ahora.getHours()).padStart(2,'0');
   const mHoy=String(ahora.getMinutes()).padStart(2,'0');
   // una receta con porciones se mide como si la porción fuera su medida práctica
-  const md=esR?(obj.porciones>1?{nom:'porción',g:obj.pesoFinal/obj.porciones}:null):obj.medida;
+  // (incluye porciones:1 — recetas para una sola persona no deberían obligar
+  // a acordarse del peso a mano)
+  const md=esR?(obj.porciones>=1?{nom:'porción',g:obj.pesoFinal/obj.porciones}:null):obj.medida;
   const medTxtU=md?(esR?'porciones ('+Math.round(md.g)+' '+u+' cada una)':md.nom+' ('+md.g+' '+u+')'):'';
   // líquidos con peso declarado: también se pueden pesar en la balanza
   const dens=(u==='ml'&&obj.dens>0)?obj.dens:0;
@@ -2715,12 +2717,16 @@ function hojaDia(clave){
 
 function pintarHistorial(){
   const hoy=hoyLogico();
-  let ini=lunesDe(hoy); ini=sumar(ini,-77);
+  const lunHoy=lunesDe(hoy);
+  const lunIni=lunesDe(D.inicio);
+  // como un calendario: crece desde la semana de inicio, nunca hay relleno
+  // de semanas vacías arriba ni abajo — solo lo que realmente ha pasado.
+  const nSem=Math.max(1,Math.floor(dif(lunIni,lunHoy)/7)+1);
   const semanas=[];
-  for(let w=0;w<12;w++){
+  for(let w=0;w<nSem;w++){
     let fila='';
     for(let d=0;d<7;d++){
-      const c=sumar(ini,w*7+d);
+      const c=sumar(lunIni,w*7+d);
       if(dif(D.inicio,c)<0||dif(c,hoy)<0){fila+='<i style="opacity:.25"></i>';continue}
       const dd=diaDe(c);
       let cl='';
