@@ -263,6 +263,12 @@ nav.mal button{color:var(--rojo)}
   transform:scaleY(.02);opacity:.6;transition:transform .16s cubic-bezier(.2,.9,.3,1),opacity .12s}
 .pop.abierto{transform:scaleY(1);opacity:1}
 .pop.logro{border-color:var(--morado-luz);box-shadow:0 0 46px rgba(95,36,159,.5)}
+.pop.logro.d1{border-color:var(--lg1);box-shadow:0 0 46px rgba(111,139,176,.5)}
+.pop.logro.d1 .ptit{color:var(--lg1)}
+.pop.logro.d2{border-color:var(--lg2);box-shadow:0 0 46px rgba(56,240,255,.5)}
+.pop.logro.d2 .ptit{color:var(--lg2)}
+.pop.logro.d3{border-color:var(--lg3);box-shadow:0 0 46px rgba(180,124,232,.55)}
+.pop.logro.d3 .ptit{color:var(--lg3)}
 .pop .cont{opacity:0;transition:opacity .16s ease .12s}
 .pop.abierto .cont{opacity:1}
 .ptit{font-family:var(--mono);font-size:13px;letter-spacing:.22em;color:var(--cian);text-transform:uppercase}
@@ -900,7 +906,10 @@ function totalesDia(clave){
     t.kcal+=c.kcal; t.prot+=c.prot; t.carb+=c.carb; t.gras+=c.gras;
     const h=parseInt(c.h.slice(0,2),10)+parseInt(c.h.slice(3),10)/60;
     if(c.cat==="desayuno"&&h<=HORA_DESAYUNO)t.desayuno=true;
-    if(t.ultima==null||h>t.ultima)t.ultima=h;
+    // una comida de madrugada (antes de las 4, el mismo corte que usa hoyLogico) sigue
+    // siendo parte de la noche del día lógico anterior para el cierre de cocina
+    const hCierre=h<4?h+24:h;
+    if(t.ultima==null||hCierre>t.ultima)t.ultima=hCierre;
     if(t.primera==null||h<t.primera)t.primera=h;
   }
   return t;
@@ -1609,6 +1618,9 @@ document.addEventListener('focusin',e=>{
     try{
       if(n.tagName==='TEXTAREA'||['text','search','url','tel','password'].includes(t)){
         const f=n.value.length; n.setSelectionRange(f,f);
+      }else if(n.value==='0'){
+        // un cero puesto por defecto: se selecciona entero, así escribir lo sobrescribe sin tener que borrarlo antes
+        n.select();
       }else{                       // number y demás: reasignar deja el cursor al final
         const v=n.value; n.value=''; n.value=v;
       }
@@ -1619,7 +1631,7 @@ document.addEventListener('focusin',e=>{
 function pop(html,opts){
   opts=opts||{};
   const el=document.createElement('div');
-  el.className=(opts.hoja?'hoja':'pop')+(opts.logro?' logro':'')+(opts.rojo?' malfijo':'');
+  el.className=(opts.hoja?'hoja':'pop')+(opts.logro?' logro'+(opts.dif?' d'+opts.dif:''):'')+(opts.rojo?' malfijo':'');
   el.addEventListener('click',ev=>{const b=ev.target.closest('button');
     if(b&&(b.disabled||b.classList.contains('inerte'))){
       ev.stopPropagation(); sfx('error');
@@ -1646,10 +1658,13 @@ function cerrar(){
   const mio=++tok;                 // si otra ventana abre antes del cierre, tok cambia
   if(el)el.classList.remove('abierto');
   setTimeout(()=>{
-    // si mientras tanto se abrió otra ventana, no la borres
+    // si mientras tanto se abrió otra ventana, no la borres ni avances la cola por ella:
+    // esa ventana nueva es responsable de su propio cierre y de avanzar la cola.
     if(capa.firstChild===el){capa.classList.remove('on');capa.innerHTML=''}
-    if(!cola.length&&tok===mio){cadena=false;sfx('cerrar')}
-    siguiente();
+    if(tok===mio){
+      if(!cola.length){cadena=false;sfx('cerrar')}
+      siguiente();
+    }
   },160);
 }
 function encolar(fn){cola.push(fn);if(!mostrando)siguiente()}
@@ -1671,8 +1686,8 @@ function sacudirSistema(sinFlash){
   });
   if(!sinFlash)flashRojo();
 }
-function aviso(titulo,cuerpo,logro,son,rojo){
-  encolar(()=>{pop('<div class="ptit">'+titulo+'</div>'+cuerpo,{logro:!!logro,sonido:son,rojo:!!rojo})});
+function aviso(titulo,cuerpo,logro,son,rojo,dif){
+  encolar(()=>{pop('<div class="ptit">'+titulo+'</div>'+cuerpo,{logro:!!logro,sonido:son,rojo:!!rojo,dif:dif})});
 }
 function confirmar(nombre,texto,onSi,rojo){
   encolar(()=>{
@@ -4023,7 +4038,7 @@ function avisarLogro(L){
     '<div class="pbig" style="font-size:21px;color:var(--lg'+L.n+')">'+L.t+'</div>'+
     '<div class="ptxt" style="margin-top:8px">'+L.d+'</div>'+
     '<div class="ptxt" style="margin-top:6px;color:var(--tenue);font-family:var(--mono);'+
-    'font-size:10px;letter-spacing:.2em;text-transform:uppercase">'+DIF[L.n]+'</div>',true,'nivel');
+    'font-size:10px;letter-spacing:.2em;text-transform:uppercase">'+DIF[L.n]+'</div>',true,'nivel',undefined,L.n);
 }
 let arranqueHecho=false;   // durante el arranque los logros se ponen al día en silencio
 function revisarLogros(){
