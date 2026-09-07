@@ -228,6 +228,11 @@ nav.mal{border-top-color:var(--rojo)}
 nav.mal button{color:var(--rojo)}
 .wrap.mal .v,.wrap.mal .m,.wrap.mal .esp,.wrap.mal nav{border-color:var(--rojo)!important}
 .wrap.mal .m .caja,.wrap.mal .m.ok .caja,.wrap.mal .m.exc .caja{border-color:var(--rojo)!important;color:var(--rojo)!important}
+@keyframes resplandor{
+  0%{box-shadow:0 0 0 rgba(180,124,232,0)}
+  35%{box-shadow:0 0 22px 4px rgba(180,124,232,.65)}
+  100%{box-shadow:0 0 0 rgba(180,124,232,0)}}
+.m.destaca{animation:resplandor .9s ease}
 .wrap.mal .m.ok .mnom,.wrap.mal .m.exc .mnom,.wrap.mal .m.rep .mnom,
 .wrap.mal .sem.done b,.wrap.mal .sem.exc2 span,.wrap.mal .sem.exc2 b,
 .wrap.mal .mrec,.wrap.mal .esq h5,.wrap.mal .rango,.wrap.mal .jug{color:var(--rojo)!important}
@@ -2908,6 +2913,12 @@ q('#p-misiones').addEventListener('click',e=>{
         }
       }
       guardar(); refrescar(true);
+      const card=q('[data-m="'+id+'"]');
+      const cardEl=card&&card.closest('.m');
+      if(cardEl&&cardEl.classList.contains('exc')){
+        sfx('premio');
+        cardEl.classList.remove('destaca');void cardEl.offsetWidth;cardEl.classList.add('destaca');
+      }
     };
     // Misiones con opciones: se pregunta cuál de ellas se hizo
     if(def.opciones&&(def.metas||[]).length){
