@@ -894,7 +894,7 @@ function txtPorc(p){
 function medTxt(ing,a){
   const g=Math.round(ing.g*10)/10;
   if(!ing.mn)return g+' '+uni(a);
-  const pl=ing.mc==1?ing.mn:(/[aeiou]$/i.test(ing.mn)?ing.mn+'s':ing.mn+'es');
+  const pl=ing.mc==1?ing.mn:(ing.mn==='porción'?'porciones':/[aeiou]$/i.test(ing.mn)?ing.mn+'s':ing.mn+'es');
   return ing.mc+' '+pl+' · '+g+' '+uni(a);
 }
 // buscar sin importar acentos ni mayúsculas
@@ -3833,15 +3833,20 @@ function formReceta(idArg,volver){
         e2.querySelectorAll('[data-i]').forEach(n=>n.onclick=()=>{
           const xid=n.dataset.i, esR=tipoIng==='r'; cerrar();
           encolar(()=>{
-            const A=esR?D.nutri.recetas[xid]:D.nutri.alimentos[xid], u=uni(A), md=A.medida;
+            const A=esR?D.nutri.recetas[xid]:D.nutri.alimentos[xid], u=uni(A);
+            // una receta usada como ingrediente también se puede medir en porciones,
+            // igual que al registrarla directo en una comida (incluye porciones:1)
+            const md=esR?(A.porciones>=1?{nom:'porción',g:A.pesoFinal/A.porciones}:null):A.medida;
+            const medTxtU=md?(esR?'porciones ('+Math.round(md.g)+' '+u+' cada una)':md.nom+' ('+md.g+' '+u+')'):'';
             const eng=u==='ml'?'mililitros':'gramos';
+            const nomU=x=>x==='m'?(esR?'porciones':md.nom):eng;
             const e3=pop('<div class="ptit">'+A.nom+'</div>'+
               (md?'<div class="camp" style="margin-top:14px"><label>Medir en</label><select id="imq">'+
-                '<option value="g">'+eng+'</option>'+
-                '<option value="m">'+md.nom+' ('+md.g+' '+u+')</option></select></div>':'')+
+                '<option value="m">'+medTxtU+'</option>'+
+                '<option value="g">'+eng+'</option></select></div>':'')+
               '<div class="camp"'+(md?'':' style="margin-top:14px"')+'>'+
-              '<label id="ilq">Cantidad en '+eng+'</label>'+
-              '<input type="text" id="ig" inputmode="text" value="100"></div>'+
+              '<label id="ilq">Cantidad en '+(md?nomU('m'):eng)+'</label>'+
+              '<input type="text" id="ig" inputmode="text" value="'+(md?1:100)+'"></div>'+
               '<div id="iprev" class="nota"></div>'+
               '<div class="pbtns"><button class="btn" data-ok>Añadir</button>'+
               '<button class="btn" data-no>Cancelar</button></div>',{cerrarAlTocar:false});
@@ -3854,7 +3859,7 @@ function formReceta(idArg,volver){
                 ' · C '+n.carb.toFixed(1)+' · G '+n.gras.toFixed(1):''};
             e3.querySelector('#ig').addEventListener('input',prev);
             if(md)e3.querySelector('#imq').addEventListener('change',()=>{
-              e3.querySelector('#ilq').textContent='Cantidad en '+(enMed()?md.nom:eng);
+              e3.querySelector('#ilq').textContent='Cantidad en '+nomU(e3.querySelector('#imq').value);
               e3.querySelector('#ig').value=enMed()?1:100; prev();
             });
             prev();
