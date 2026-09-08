@@ -849,9 +849,9 @@ function recetaPorG(r){
 function totalReceta(r){
   const t={k:0,p:0,c:0,g:0};
   for(const ing of (r.ing||[])){
-    const a=D.nutri.alimentos[ing.id]; if(!a)continue;
-    const u=por100(a), f=ing.g/100;
-    t.k+=u.k*f; t.p+=u.p*f; t.c+=u.c*f; t.g+=u.g*f;
+    const ref=ing.id.startsWith('a:')||ing.id.startsWith('r:')?ing.id:'a:'+ing.id; // ids viejos sin prefijo son alimentos
+    const n=nutreDe(ref,ing.g); if(!n)continue;
+    t.k+=n.kcal; t.p+=n.prot; t.c+=n.carb; t.g+=n.gras;
   }
   return t;
 }
@@ -1100,7 +1100,8 @@ function calcular(hasta){
   const fin=hasta||hoyLogico();
   const total=Math.max(0,dif(D.inicio,fin));
   const at={};for(const c of CLAVES)at[c]={esc:0,esqP:0,lib:0,esq:0,decN:0,decH:[]};
-  let xp=0,nivel=1,racha=0,perdon=false,pend=0,rachaMax=0;
+  let xp=0,nivel=1,racha=0,pend=0,rachaMax=0;
+  let cooldownPerdon=0,bloqueado=false;
   const eventos=[],bloques=[],semanas=[];
   let contB=cero(),puntosB=0,turnoB=0,bIdx=0,conval=false,gracia=false,modoPrev=null;
   const contSem={},esqDada={},fallos={};
@@ -1257,14 +1258,17 @@ function calcular(hasta){
     const minR=CFG.rachaMin[m];
     const sem=D.semanas[semKey]||{};
     const descHoy=sem.descansoDia===clave;
-    if(hechas>=minR)racha++;
-    else if(escudo||descHoy){/* congela */}
-    else if(!perdon)perdon=true;
-    else racha=0;
+    if(cooldownPerdon>0)cooldownPerdon--;   // los 14 días de enfriamiento corren siempre, pase lo que pase el día
+    if(hechas>=minR){
+      racha++;
+      if(bloqueado&&racha>=3)bloqueado=false;   // racha de 3 días reconstruida: se reactiva el perdón
+    }else if(escudo||descHoy){/* congela, no gasta ni rompe nada */}
+    else if(cooldownPerdon>0||bloqueado){racha=0;bloqueado=true;cooldownPerdon=0}
+    else{cooldownPerdon=14;/* congela, gasta el perdón y arrancan 14 días sin protección */}
     if(racha>rachaMax)rachaMax=racha;
     if(hechas<minR&&!escudo&&!descHoy)fallos[clave]=true;
 
-    if(esLunes(clave)&&i>0){cerrarSemana(sumar(clave,-7),modo,mult);perdon=false}
+    if(esLunes(clave)&&i>0){cerrarSemana(sumar(clave,-7),modo,mult)}
     if((i+1)%CFG.diasBloque===0&&i>0)cerrarBloque(clave,modo);
   }
 
@@ -3526,11 +3530,13 @@ function congelarReceta(id){
   const r=D.nutri.recetas[id]; if(!r)return null;
   const t=r.tot||totalReceta(r);
   const ing=(r.ing||[]).map(x=>{
-    const a=D.nutri.alimentos[x.id];
-    if(!a)return {nom:'(eliminado)',txt:Math.round(x.g*10)/10+' g',k:0,p:0,c:0,gr:0};
-    const u=por100(a), f=x.g/100;
-    return {nom:(a.marca?a.marca+' · ':'')+a.nom,txt:medTxt(x,a),
-      k:u.k*f,p:u.p*f,c:u.c*f,gr:u.g*f};
+    const ref=x.id.startsWith('a:')||x.id.startsWith('r:')?x.id:'a:'+x.id;
+    const esR=ref.startsWith('r:');
+    const o=esR?D.nutri.recetas[ref.slice(2)]:D.nutri.alimentos[ref.slice(2)];
+    if(!o)return {nom:'(eliminado)',txt:Math.round(x.g*10)/10+' g',k:0,p:0,c:0,gr:0};
+    const n=nutreDe(ref,x.g);
+    return {nom:(esR?'':(o.marca?o.marca+' · ':''))+o.nom,txt:medTxt(x,o),
+      k:n.kcal,p:n.prot,c:n.carb,gr:n.gras};
   });
   return {nom:r.nom,pesoFinal:r.pesoFinal,unidad:uni(r),porciones:r.porciones||0,
     prep:r.prep||'',tot:{k:t.k,p:t.p,c:t.c,g:t.g},ing:ing};
@@ -3568,12 +3574,14 @@ function verReceta(id,volver){
   const u100=recetaPorG(r), t=r.tot||totalReceta(r);
   let cuerpo='<p class="eyebrow">Ingredientes</p>';
   for(const ing of (r.ing||[])){
-    const a=D.nutri.alimentos[ing.id];
-    if(!a){cuerpo+='<div class="sem"><span>(eliminado)</span></div>';continue}
-    const p=por100(a), f=ing.g/100;
-    cuerpo+='<div class="item"><span>'+(a.marca?a.marca+' · ':'')+a.nom+
-      '<small>'+medTxt(ing,a)+' · P '+(p.p*f).toFixed(1)+' C '+(p.c*f).toFixed(1)+' G '+(p.g*f).toFixed(1)+'</small></span>'+
-      '<span class="kc">'+Math.round(p.k*f)+'</span></div>';
+    const ref=ing.id.startsWith('a:')||ing.id.startsWith('r:')?ing.id:'a:'+ing.id;
+    const esR=ref.startsWith('r:');
+    const o=esR?D.nutri.recetas[ref.slice(2)]:D.nutri.alimentos[ref.slice(2)];
+    if(!o){cuerpo+='<div class="sem"><span>(eliminado)</span></div>';continue}
+    const n=nutreDe(ref,ing.g);
+    cuerpo+='<div class="item"><span>'+(esR?'':(o.marca?o.marca+' · ':''))+o.nom+(esR?' <small style="color:var(--cian)">· receta</small>':'')+
+      '<small>'+medTxt(ing,o)+' · P '+n.prot.toFixed(1)+' C '+n.carb.toFixed(1)+' G '+n.gras.toFixed(1)+'</small></span>'+
+      '<span class="kc">'+Math.round(n.kcal)+'</span></div>';
   }
   cuerpo+='<p class="eyebrow" style="margin-top:16px">Total</p>'+
     '<div class="sem"><span>Cantidad final</span><b style="margin-left:auto">'+r.pesoFinal+' '+uni(r)+
@@ -3688,20 +3696,28 @@ function formAlimento(id,volver){
 }
 
 function listaRecetas(){
-  const el=hoja('Recetas','<div class="reslist" id="rl2"></div>',
+  const el=hoja('Recetas',
+    '<div class="camp buscador"><input type="text" id="rq" placeholder="Buscar"></div>'+
+    '<div class="reslist" id="rl2"></div>',
     '<button data-nuevo style="background:none;border:0;color:var(--cian);font-size:24px;cursor:pointer;padding:0 6px">+</button>',
     hojaAlim);
-  const ids=Object.keys(D.nutri.recetas)
-    .sort((a,b)=>norm(D.nutri.recetas[a].nom).localeCompare(norm(D.nutri.recetas[b].nom)));
-  el.querySelector('#rl2').innerHTML=ids.map(id=>{const r=D.nutri.recetas[id];
-    const u=recetaPorG(r);
-    return '<div class="item"><span data-ver="'+id+'" style="cursor:pointer;flex:1">'+r.nom+
-      '<small>'+r.pesoFinal+' '+uni(r)+' · '+Math.round(u.k*100)+' kcal/100'+uni(r)+
-      (r.porciones>1?' · '+r.porciones+' porciones':'')+(r.prep?' · con preparación':'')+'</small></span>'+
-      '<button data-ed="'+id+'" class="lapiz">✎</button></div>'}).join('')||'<p class="nota">Todavía no hay recetas.</p>';
-  el.querySelectorAll('[data-ed]').forEach(b=>b.onclick=()=>{const id=b.dataset.ed;cerrar();encolar(()=>formReceta(id,listaRecetas))});
-  el.querySelectorAll('[data-ver]').forEach(n=>n.onclick=()=>{
-    const id=n.dataset.ver; cerrar(); encolar(()=>verReceta(id,listaRecetas))});
+  const pintar=()=>{
+    const f=norm(el.querySelector('#rq').value);
+    const ids=Object.keys(D.nutri.recetas)
+      .filter(id=>!f||norm(D.nutri.recetas[id].nom).includes(f))
+      .sort((a,b)=>norm(D.nutri.recetas[a].nom).localeCompare(norm(D.nutri.recetas[b].nom)));
+    el.querySelector('#rl2').innerHTML=ids.map(id=>{const r=D.nutri.recetas[id];
+      const u=recetaPorG(r);
+      return '<div class="item"><span data-ver="'+id+'" style="cursor:pointer;flex:1">'+r.nom+
+        '<small>'+r.pesoFinal+' '+uni(r)+' · '+Math.round(u.k*100)+' kcal/100'+uni(r)+
+        (r.porciones>1?' · '+r.porciones+' porciones':'')+(r.prep?' · con preparación':'')+'</small></span>'+
+        '<button data-ed="'+id+'" class="lapiz">✎</button></div>'}).join('')||'<p class="nota">'+(f?'Sin resultados.':'Todavía no hay recetas.')+'</p>';
+    el.querySelectorAll('[data-ed]').forEach(b=>b.onclick=()=>{const id=b.dataset.ed;cerrar();encolar(()=>formReceta(id,listaRecetas))});
+    el.querySelectorAll('[data-ver]').forEach(n=>n.onclick=()=>{
+      const id=n.dataset.ver; cerrar(); encolar(()=>verReceta(id,listaRecetas))});
+  };
+  el.querySelector('#rq').addEventListener('input',pintar);
+  pintar();
   el.querySelector('[data-nuevo]').onclick=()=>{cerrar();encolar(()=>formReceta(null,listaRecetas))};
 }
 
@@ -3725,8 +3741,12 @@ function formReceta(idArg,volver){
   const el=hoja(id?'Editar receta':'Nueva receta',
     '<div class="camp"><label>Nombre</label><input type="text" id="r-n" value="'+(r.nom||'').replace(/"/g,'&quot;')+'"></div>'+
     '<p class="eyebrow">Ingredientes</p>'+
-    (r.ing.length?r.ing.map((x,i)=>{const a=D.nutri.alimentos[x.id];
-      return '<div class="item"><span>'+(a?a.nom:'?')+'<small>'+medTxt(x,a)+'</small></span>'+
+    (r.ing.length?r.ing.map((x,i)=>{
+      const ref=x.id.startsWith('a:')||x.id.startsWith('r:')?x.id:'a:'+x.id;
+      const esR=ref.startsWith('r:');
+      const o=esR?D.nutri.recetas[ref.slice(2)]:D.nutri.alimentos[ref.slice(2)];
+      return '<div class="item"><span>'+(o?o.nom:'?')+(esR?' <small style="color:var(--cian)">· receta</small>':'')+
+        '<small>'+medTxt(x,o)+'</small></span>'+
         '<button data-q="'+i+'">×</button></div>'}).join(''):'<p class="nota">Sin ingredientes.</p>')+
     '<button class="addbtn" data-ing>+ Añadir ingrediente</button>'+
     '<p class="nota">Total crudo: '+Math.round(t.k)+' kcal · P '+t.p.toFixed(1)+' · C '+t.c.toFixed(1)+' · G '+t.g.toFixed(1)+'</p>'+
@@ -3771,8 +3791,12 @@ function formReceta(idArg,volver){
   };
   function pantallaIngrediente(){
     {
+      let tipoIng='a';
       const e2=hoja('Ingrediente',
-        '<div class="camp buscador"><input type="text" id="iq" placeholder="Buscar alimento"></div>'+
+        '<div class="pbtns" style="margin-bottom:12px">'+
+        '<button class="btn" data-tipo="a" id="ti-a">Alimentos</button>'+
+        '<button class="btn" data-tipo="r" id="ti-r">Recetas</button></div>'+
+        '<div class="camp buscador"><input type="text" id="iq" placeholder="Buscar"></div>'+
         '<div class="reslist" id="il"></div>',
         '<button data-nuevoal style="background:none;border:0;color:var(--cian);font-size:24px;'+
         'cursor:pointer;padding:0 6px">+</button>',
@@ -3782,22 +3806,34 @@ function formReceta(idArg,volver){
         cerrar();
         encolar(()=>formAlimento(null,pantallaIngrediente));
       };
+      const marcarTipo=()=>{
+        e2.querySelector('#ti-a').style.opacity=tipoIng==='a'?'1':'.5';
+        e2.querySelector('#ti-r').style.opacity=tipoIng==='r'?'1':'.5';
+        e2.querySelector('#iq').placeholder=tipoIng==='r'?'Buscar receta':'Buscar alimento';
+      };
       const pin=()=>{
         const f=norm(e2.querySelector('#iq').value);
-        const ids=Object.keys(D.nutri.alimentos).filter(x=>!f||norm(D.nutri.alimentos[x].nom).includes(f)||norm(D.nutri.alimentos[x].marca).includes(f));
-        e2.querySelector('#il').innerHTML=ids.map(x=>{
-          const a=D.nutri.alimentos[x];
-          // la marca y las calorías, igual que en la base de datos:
-          // sin ellas no se distinguen dos productos con el mismo nombre
-          return '<div class="item" data-i="'+x+'" style="cursor:pointer">'+
-            '<span>'+(a.marca?a.marca+' · ':'')+a.nom+
-            '<small>'+Math.round(a.kcal)+' kcal/100'+uni(a)+
-            (a.medida?' · '+a.medida.nom+' '+a.medida.g+' '+uni(a):'')+'</small></span></div>';
-        }).join('')||'<p class="nota">Nada encontrado.</p>';
+        if(tipoIng==='r'){
+          const ids=Object.keys(D.nutri.recetas).filter(x=>x!==recetaId&&(!f||norm(D.nutri.recetas[x].nom).includes(f)));
+          e2.querySelector('#il').innerHTML=ids.map(x=>{
+            const rc=D.nutri.recetas[x], u=recetaPorG(rc);
+            return '<div class="item" data-i="'+x+'" style="cursor:pointer">'+
+              '<span>'+rc.nom+'<small>'+Math.round(u.k*100)+' kcal/100'+uni(rc)+'</small></span></div>';
+          }).join('')||'<p class="nota">Nada encontrado.</p>';
+        }else{
+          const ids=Object.keys(D.nutri.alimentos).filter(x=>!f||norm(D.nutri.alimentos[x].nom).includes(f)||norm(D.nutri.alimentos[x].marca).includes(f));
+          e2.querySelector('#il').innerHTML=ids.map(x=>{
+            const a=D.nutri.alimentos[x];
+            return '<div class="item" data-i="'+x+'" style="cursor:pointer">'+
+              '<span>'+(a.marca?a.marca+' · ':'')+a.nom+
+              '<small>'+Math.round(a.kcal)+' kcal/100'+uni(a)+
+              (a.medida?' · '+a.medida.nom+' '+a.medida.g+' '+uni(a):'')+'</small></span></div>';
+          }).join('')||'<p class="nota">Nada encontrado.</p>';
+        }
         e2.querySelectorAll('[data-i]').forEach(n=>n.onclick=()=>{
-          const aid=n.dataset.i; cerrar();
+          const xid=n.dataset.i, esR=tipoIng==='r'; cerrar();
           encolar(()=>{
-            const A=D.nutri.alimentos[aid], u=uni(A), md=A.medida;
+            const A=esR?D.nutri.recetas[xid]:D.nutri.alimentos[xid], u=uni(A), md=A.medida;
             const eng=u==='ml'?'mililitros':'gramos';
             const e3=pop('<div class="ptit">'+A.nom+'</div>'+
               (md?'<div class="camp" style="margin-top:14px"><label>Medir en</label><select id="imq">'+
@@ -3812,7 +3848,7 @@ function formReceta(idArg,volver){
             const enMed=()=>md&&e3.querySelector('#imq').value==='m';
             const cant=()=>num(e3.querySelector('#ig').value)||0;
             const gr=()=>enMed()?cant()*md.g:cant();
-            const prev=()=>{const g=gr(), n=nutreDe('a:'+aid,g);
+            const prev=()=>{const g=gr(), n=nutreDe((esR?'r:':'a:')+xid,g);
               e3.querySelector('#iprev').innerHTML=n?
                 (Math.round(g*10)/10)+' '+u+' · '+Math.round(n.kcal)+' kcal · P '+n.prot.toFixed(1)+
                 ' · C '+n.carb.toFixed(1)+' · G '+n.gras.toFixed(1):''};
@@ -3826,7 +3862,7 @@ function formReceta(idArg,volver){
             e3.querySelector('[data-ok]').onclick=()=>{
               const g=Math.round(gr()*100)/100;
               if(!(g>0)){e3.querySelector('#ig').style.borderColor='var(--rojo)';return}
-              const ing={id:aid,g};
+              const ing={id:(esR?'r:':'a:')+xid,g};
               if(enMed()){ing.mc=cant();ing.mn=md.nom}   // se guarda cómo lo mediste
               r.ing.push(ing);
               cerrar(); encolar(()=>formReceta());
@@ -3834,6 +3870,10 @@ function formReceta(idArg,volver){
           });
         });
       };
+      e2.querySelectorAll('[data-tipo]').forEach(b=>b.onclick=()=>{
+        tipoIng=b.dataset.tipo; marcarTipo(); pin();
+      });
+      marcarTipo();
       e2.querySelector('#iq').addEventListener('input',pin); pin();
     }
   }
@@ -4515,7 +4555,7 @@ function hojaManual(){
     '<p class="eyebrow" style="margin-top:16px">Atributos</p><p>Suben por 3 vías: el bloque de 28 días (máximo +1 por atributo, sube el objetivo), las esquirlas (5 = +1 inmediato) y el punto libre de cada nivel. Al cerrar el bloque: si llegas al objetivo, +1; entre la mitad y el objetivo, nada; bajo la mitad, −1; bajo un cuarto, −2. Nunca por debajo de tu base.</p>'+
     '<p>3 bloques seguidos con decaimiento quitan además puntos ganados por esquirlas.</p>'+
     '<p class="eyebrow" style="margin-top:16px">Esquirlas</p><p>1 por atributo por semana. El resto del excedente sigue dando XP. 5 esquirlas del mismo atributo dan 1 punto. Máximo 4 puntos por bloque; las de semana perfecta van aparte y convierten primero. Las sobrantes se guardan para siempre.</p>'+
-    '<p class="eyebrow" style="margin-top:16px">Racha</p><p>Se rompe con menos de 4 misiones en el día (3 en ciclo). Tienes 1 perdón por semana. Las opcionales no cuentan ni rompen. Well Rested, Field Duty, Triage y Critical Condition nunca rompen.</p>'+
+    '<p class="eyebrow" style="margin-top:16px">Racha</p><p>Se rompe con menos de 4 misiones en el día (3 en ciclo). Tienes 1 perdón disponible: si fallas un día sin escudo, la racha se congela en vez de romperse y las 2 semanas siguientes quedan sin protección — cualquier fallo en ese tramo rompe la racha del todo. Si pasan esas 2 semanas sin fallar, el perdón vuelve solo. Si la racha llega a romperse del todo, el perdón queda bloqueado hasta reconstruir una racha nueva de 3 días seguidos. Las opcionales no cuentan ni rompen. Well Rested, Field Duty, Triage y Critical Condition nunca rompen.</p>'+
     '<p class="eyebrow" style="margin-top:16px">Historial · detalle del día</p>'+
     '<p>Cada cuadrito del mapa es tocable. Al tocarlo verás el estado de ese día, el modo, el peso si lo registraste, las horas de Field Duty, todas las misiones que hiciste con sus repeticiones, y la comida completa: cada registro con su hora, cantidad, macros y calorías, el total contra la meta de ese día y los 5 parámetros de Sustenance Code uno por uno.</p>'+
     '<p>Un día se marca como cumplido cuando llegaste al mínimo de misiones de la racha, o cuando quedó escudado por Field Duty, Triage o Critical Condition. En esos días las misiones que no hiciste no cuentan como falladas en la lista de "Misiones que más fallas": Physical Protocol es de 3 días por semana, así que no entrenar un martes no es un fallo si el día lo cumpliste igual.</p>'+
