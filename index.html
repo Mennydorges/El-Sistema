@@ -1258,15 +1258,16 @@ function calcular(hasta){
     const minR=CFG.rachaMin[m];
     const sem=D.semanas[semKey]||{};
     const descHoy=sem.descansoDia===clave;
-    if(cooldownPerdon>0)cooldownPerdon--;   // los 14 días de enfriamiento corren siempre, pase lo que pase el día
+    const esHoyAbierto=!hasta&&clave===fin;   // el día de hoy, aún sin cerrar: no se juzga como fallo todavía
+    if(cooldownPerdon>0&&!esHoyAbierto)cooldownPerdon--;   // los 14 días de enfriamiento corren siempre, pase lo que pase el día (pero no antes de que el día cierre)
     if(hechas>=minR){
       racha++;
       if(bloqueado&&racha>=3)bloqueado=false;   // racha de 3 días reconstruida: se reactiva el perdón
-    }else if(escudo||descHoy){/* congela, no gasta ni rompe nada */}
+    }else if(escudo||descHoy||esHoyAbierto){/* congela: protegido, o simplemente hoy sigue abierto */}
     else if(cooldownPerdon>0||bloqueado){racha=0;bloqueado=true;cooldownPerdon=0}
     else{cooldownPerdon=14;/* congela, gasta el perdón y arrancan 14 días sin protección */}
     if(racha>rachaMax)rachaMax=racha;
-    if(hechas<minR&&!escudo&&!descHoy)fallos[clave]=true;
+    if(hechas<minR&&!escudo&&!descHoy&&!esHoyAbierto)fallos[clave]=true;
 
     if(esLunes(clave)&&i>0){cerrarSemana(sumar(clave,-7),modo,mult)}
     if((i+1)%CFG.diasBloque===0&&i>0)cerrarBloque(clave,modo);
@@ -2547,13 +2548,55 @@ function añadirComida(cat){
       '<div class="pbtns" style="flex-direction:column;margin-top:14px">'+
       '<button class="btn" data-k="a">Añadir producto</button>'+
       '<button class="btn" data-k="r">Añadir receta</button>'+
+      '<button class="btn" data-k="t">Trash food</button>'+
+      '<button class="btn" data-k="f">Comida afuera</button>'+
       '<button class="btn" data-no>Cancelar</button></div>',{cerrarAlTocar:false});
     e0.querySelector('[data-no]').onclick=cerrar;
     e0.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{
-      const k=b.dataset.k; cerrar(); encolar(()=>buscarPara(cat,k));
+      const k=b.dataset.k; cerrar();
+      if(k==='t'||k==='f')encolar(()=>comidaRapida(cat,k==='t'?'Trash food':'Comida afuera'));
+      else encolar(()=>buscarPara(cat,k));
     });
   });
 }
+// Registro rápido a mano: sin pasar por la base de alimentos, para lo que no tiene
+// caso guardar como producto reusable (comida chatarra puntual, o una aproximación
+// de algo que comiste afuera y no vas a repetir igual).
+function comidaRapida(cat,titulo){
+  const ahora=new Date();
+  const hHoy=String(ahora.getHours()).padStart(2,'0');
+  const mHoy=String(ahora.getMinutes()).padStart(2,'0');
+  const e=pop('<div class="ptit">'+titulo+'</div>'+
+    '<div class="camp" style="margin-top:14px"><label>Qué comiste</label>'+
+    '<input type="text" id="cn" placeholder="Nombre"></div>'+
+    '<div class="camp"><label>Calorías</label><input type="text" id="ck" inputmode="text" value="0"></div>'+
+    '<div class="camp"><label>Proteína (g)</label><input type="text" id="cp" inputmode="text" value="0"></div>'+
+    '<div class="camp"><label>Carbohidratos (g)</label><input type="text" id="cc" inputmode="text" value="0"></div>'+
+    '<div class="camp"><label>Grasas (g)</label><input type="text" id="cg" inputmode="text" value="0"></div>'+
+    '<div class="camp"><label>Hora</label><div class="reloj">'+
+    '<input type="number" id="ch" min="0" max="23" step="1" inputmode="numeric" value="'+hHoy+'">'+
+    '<b>:</b>'+
+    '<input type="number" id="cm" min="0" max="59" step="1" inputmode="numeric" value="'+mHoy+'">'+
+    '</div></div>'+
+    '<div class="pbtns"><button class="btn" data-ok>Registrar</button>'+
+    '<button class="btn" data-no>Cancelar</button></div>',{cerrarAlTocar:false});
+  e.querySelector('[data-no]').onclick=()=>{cerrar();encolar(()=>añadirComida(cat))};
+  e.querySelector('[data-ok]').onclick=()=>{
+    const hoy=hoyComida();
+    const nom=e.querySelector('#cn').value.trim()||titulo;
+    const kcal=num(e.querySelector('#ck').value)||0;
+    const prot=num(e.querySelector('#cp').value)||0;
+    const carb=num(e.querySelector('#cc').value)||0;
+    const gras=num(e.querySelector('#cg').value)||0;
+    const hh=String(Math.min(23,Math.max(0,parseInt(e.querySelector('#ch').value,10)||0))).padStart(2,'0');
+    const mm=String(Math.min(59,Math.max(0,parseInt(e.querySelector('#cm').value,10)||0))).padStart(2,'0');
+    D.dias[hoy]=D.dias[hoy]||{}; D.dias[hoy].comidas=D.dias[hoy].comidas||[];
+    D.dias[hoy].comidas.push({uid:'c'+Date.now().toString(36),cat,ref:null,nom,
+      g:0,h:hh+':'+mm,u:'g',porc:0,kcal,prot,carb,gras,snap:null});
+    guardar(); cerrar(); refrescar(true);
+  };
+}
+
 function buscarPara(cat,tipo){
   {
     const el=hoja(tipo==='r'?'Recetas':'Productos y alimentos',
