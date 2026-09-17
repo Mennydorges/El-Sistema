@@ -2400,17 +2400,27 @@ function entrenoEn(clave){
 // Base de un día sin sesión de entrenamiento: ligero, no sedentario.
 // El cardio diario, caminar en el hospital y estar de pie ya viven aquí.
 const ACT_BASE=1.375;
+// Devuelve la configuración de calorías vigente en 'clave', no la de hoy.
+// Sin historial (nunca se ha tocado el formulario desde este cambio) se usa D.calorias tal cual.
+function caloriasEn(clave){
+  const h=D.caloriasHist;
+  if(!h||!h.length)return D.calorias;
+  let cfg=h[0];
+  for(const e of h){if(e.fecha<=clave)cfg=e; else break}
+  return cfg;
+}
 function mantenimientoCal(clave){
-  const c=D.calorias;
-  const ent=entrenoEn(clave||hoyComida());
+  clave=clave||hoyComida();
+  const c=caloriasEn(clave);
+  const ent=entrenoEn(clave);
   if(c.modo==='manual'&&c.manual){
     if(ent)return c.manual;
     return c.manualSed>0?c.manualSed:c.manual;
   }
   const talla=c.talla||165, edad=c.edad||23;
   const act=ent?(c.actividad||1.55):ACT_BASE;
-  // peso: promedio de los últimos 4 registros, para que la meta no salte cada domingo
-  const ps=Object.keys(D.dias).filter(k=>D.dias[k].peso).sort().slice(-4).map(k=>D.dias[k].peso);
+  // peso: promedio de los últimos 4 registros CONOCIDOS HASTA ESE DÍA, para no recalcular el pasado con pesos futuros
+  const ps=Object.keys(D.dias).filter(k=>k<=clave&&D.dias[k].peso).sort().slice(-4).map(k=>D.dias[k].peso);
   if(!ps.length)return c.valor||2050;
   const peso=ps.reduce((a,b)=>a+b,0)/ps.length;
   const basal=10*peso+6.25*talla-5*edad+5;
@@ -2425,18 +2435,21 @@ function enPesoIdeal(){
   const pi=D.calorias.pesoIdeal, p=pesoActual();
   return !!(pi>0&&p!=null&&p<=pi);
 }
-function deficitCal(){
+function deficitCal(clave){
+  if(clave==null)clave=hoyComida();
   if(enPesoIdeal())return 0;
-  const d=D.calorias.deficit; return d==null?500:d;
+  const c=caloriasEn(clave);
+  const d=c.deficit; return d==null?500:d;
 }
 // Meta del día: mantenimiento menos el déficit. Nunca por debajo del metabolismo basal.
 function metaCal(clave){
-  const mant=mantenimientoCal(clave), def=deficitCal();
-  const c=D.calorias;
+  clave=clave||hoyComida();
+  const mant=mantenimientoCal(clave), def=deficitCal(clave);
+  const c=caloriasEn(clave);
   let piso=1200;
   if(!(c.modo==='manual'&&c.manual)){
     const talla=c.talla||165, edad=c.edad||23, act=c.actividad||1.375;
-    const ps=Object.keys(D.dias).filter(k=>D.dias[k].peso).sort().slice(-4).map(k=>D.dias[k].peso);
+    const ps=Object.keys(D.dias).filter(k=>k<=clave&&D.dias[k].peso).sort().slice(-4).map(k=>D.dias[k].peso);
     if(ps.length){const peso=ps.reduce((a,b)=>a+b,0)/ps.length;
       piso=10*peso+6.25*talla-5*edad+5}
   }
@@ -3468,21 +3481,32 @@ function hojaCalorias(){
   });
   ver(); previa();
   el.querySelector('[data-ok]').onclick=()=>{
+    const hoy=hoyLogico();
+    const nuevo={fecha:hoy};
     const m=el.querySelector('#cmodo').value;
-    D.calorias.modo=m;
-    D.calorias.deficit=Math.max(0,parseInt(el.querySelector('#cdef').value,10)||0);
+    nuevo.modo=m;
+    nuevo.deficit=Math.max(0,parseInt(el.querySelector('#cdef').value,10)||0);
     const pi=num(el.querySelector('#cpi').value);
-    D.calorias.pesoIdeal=pi>0?pi:null;
+    nuevo.pesoIdeal=pi>0?pi:null;
     if(m==='manual'){
       const v=parseInt(el.querySelector('#cmanual').value,10);
-      if(v>0)D.calorias.manual=v;
+      nuevo.manual=v>0?v:(D.calorias.manual||null);
       const vs=parseInt(el.querySelector('#cmansed').value,10);
-      D.calorias.manualSed=vs>0?vs:null;
+      nuevo.manualSed=vs>0?vs:null;
+      nuevo.talla=D.calorias.talla; nuevo.edad=D.calorias.edad; nuevo.actividad=D.calorias.actividad;
     }else{
-      D.calorias.talla=parseInt(el.querySelector('#ctalla').value,10)||165;
-      D.calorias.edad=parseInt(el.querySelector('#cedad').value,10)||23;
-      D.calorias.actividad=parseFloat(el.querySelector('#cact').value)||1.55;
+      nuevo.talla=parseInt(el.querySelector('#ctalla').value,10)||165;
+      nuevo.edad=parseInt(el.querySelector('#cedad').value,10)||23;
+      nuevo.actividad=parseFloat(el.querySelector('#cact').value)||1.55;
+      nuevo.manual=D.calorias.manual; nuevo.manualSed=D.calorias.manualSed;
     }
+    D.caloriasHist=D.caloriasHist||[];
+    // primera vez que se usa el historial: lo de antes de hoy se queda con la configuración vieja tal cual estaba
+    if(!D.caloriasHist.length)D.caloriasHist.push(Object.assign({},D.calorias,{fecha:D.inicio}));
+    const idxHoy=D.caloriasHist.findIndex(e=>e.fecha===hoy);
+    if(idxHoy>=0)D.caloriasHist[idxHoy]=nuevo; else D.caloriasHist.push(nuevo);
+    D.caloriasHist.sort((a,b)=>a.fecha<b.fecha?-1:a.fecha>b.fecha?1:0);
+    Object.assign(D.calorias,nuevo);   // D.calorias queda como "la config actual", para precargar este formulario
     cerrar(); guardar(); refrescar();
   };
 }
