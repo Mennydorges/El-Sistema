@@ -1270,7 +1270,7 @@ function calcular(hasta){
     if(hechas<minR&&!escudo&&!descHoy&&!esHoyAbierto)fallos[clave]=true;
 
     if(esLunes(clave)&&i>0){cerrarSemana(sumar(clave,-7),modo,mult)}
-    if((i+1)%CFG.diasBloque===0&&i>0)cerrarBloque(clave,modo);
+    if(i%CFG.diasBloque===0&&i>0)cerrarBloque(sumar(clave,-1),modo);
   }
 
   function cerrarSemana(semKey,modo,mult){
@@ -2489,7 +2489,7 @@ function pintarComida(){
     (enPesoIdeal()?'<p class="nota" style="margin:6px 0 0">Peso objetivo alcanzado · en mantenimiento</p>':'');
 
   q('#c-macros').innerHTML=[
-    ["Proteína",t.prot,mm.prot,"prot"],["Carbos",t.carb,mm.carb,"carb"],["Grasas",t.gras,mm.gras,"gras"]
+    ["Grasas",t.gras,mm.gras,"gras"],["Carbos",t.carb,mm.carb,"carb"],["Proteína",t.prot,mm.prot,"prot"]
   ].map(([n,v,m,id])=>{
     const enRango=id!=="prot"&&v>=m/2&&v<=m, pasado=v>m;
     return '<div class="macro'+(pasado?' pasado':(enRango?' rango':''))+'">'+
@@ -2509,10 +2509,10 @@ function pintarComida(){
     const sm=k=>its.reduce((a,c)=>a+(c[k]||0),0);
     const sub=sm('kcal');
     return '<div class="v"><div class="catcab"><h4>'+nom+'</h4><b>'+Math.round(sub)+' kcal'+
-      (its.length?' · P '+g1(sm('prot'))+' C '+g1(sm('carb'))+' G '+g1(sm('gras')):'')+'</b></div>'+
+      (its.length?' · G '+g1(sm('gras'))+' C '+g1(sm('carb'))+' P '+g1(sm('prot')):'')+'</b></div>'+
       (its.length?its.map((c,i)=>'<div class="item"><span data-ficha="'+c.ref+'" data-uid="'+c.uid+'" style="cursor:pointer">'+c.nom+
         '<small>'+c.h+' · '+(c.porc>0?txtPorc(c.porc)+' · ':'')+
-        Math.round(c.g)+' '+(c.u||'g')+' · P '+g1(c.prot)+' C '+g1(c.carb)+' G '+g1(c.gras)+'</small></span>'+
+        Math.round(c.g)+' '+(c.u||'g')+' · G '+g1(c.gras)+' C '+g1(c.carb)+' P '+g1(c.prot)+'</small></span>'+
         '<span class="kc">'+Math.round(c.kcal)+'</span>'+
         '<button data-borra="'+c.uid+'">×</button></div>').join('')
         :'<p class="nota" style="margin:0">Sin registros.</p>')+
@@ -2562,12 +2562,12 @@ function añadirComida(cat){
       '<button class="btn" data-k="a">Añadir producto</button>'+
       '<button class="btn" data-k="r">Añadir receta</button>'+
       '<button class="btn" data-k="t">Trash food</button>'+
-      '<button class="btn" data-k="f">Comida afuera</button>'+
+      '<button class="btn" data-k="f">Aproximación</button>'+
       '<button class="btn" data-no>Cancelar</button></div>',{cerrarAlTocar:false});
     e0.querySelector('[data-no]').onclick=cerrar;
     e0.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{
       const k=b.dataset.k; cerrar();
-      if(k==='t'||k==='f')encolar(()=>comidaRapida(cat,k==='t'?'Trash food':'Comida afuera'));
+      if(k==='t'||k==='f')encolar(()=>comidaRapida(cat,k==='t'?'Trash food':'Aproximación'));
       else encolar(()=>buscarPara(cat,k));
     });
   });
@@ -2583,9 +2583,9 @@ function comidaRapida(cat,titulo){
     '<div class="camp" style="margin-top:14px"><label>Qué comiste</label>'+
     '<input type="text" id="cn" placeholder="Nombre"></div>'+
     '<div class="camp"><label>Calorías</label><input type="text" id="ck" inputmode="text" value="0"></div>'+
-    '<div class="camp"><label>Proteína (g)</label><input type="text" id="cp" inputmode="text" value="0"></div>'+
-    '<div class="camp"><label>Carbohidratos (g)</label><input type="text" id="cc" inputmode="text" value="0"></div>'+
     '<div class="camp"><label>Grasas (g)</label><input type="text" id="cg" inputmode="text" value="0"></div>'+
+    '<div class="camp"><label>Carbohidratos (g)</label><input type="text" id="cc" inputmode="text" value="0"></div>'+
+    '<div class="camp"><label>Proteína (g)</label><input type="text" id="cp" inputmode="text" value="0"></div>'+
     '<div class="camp"><label>Hora</label><div class="reloj">'+
     '<input type="number" id="ch" min="0" max="23" step="1" inputmode="numeric" value="'+hHoy+'">'+
     '<b>:</b>'+
@@ -2691,7 +2691,7 @@ function cantidadComida(cat,ref,volver){
     const n=nutreDe(ref,g);
     el.querySelector('#prev').innerHTML=n?
       Math.round(g)+' '+u+(dens?'  ·  '+Math.round(g*dens/100)+' g':'')+
-      ' · '+Math.round(n.kcal)+' kcal · P '+n.prot.toFixed(1)+' · C '+n.carb.toFixed(1)+' · G '+n.gras.toFixed(1):'';
+      ' · '+Math.round(n.kcal)+' kcal · G '+n.gras.toFixed(1)+' · C '+n.carb.toFixed(1)+' · P '+n.prot.toFixed(1):'';
   };
   el.querySelector('#gq').addEventListener('input',prev);
   if(hayMq)el.querySelector('#mq').addEventListener('change',()=>{
@@ -2776,11 +2776,11 @@ function hojaDia(clave){
       const sm=k2=>its.reduce((a,x)=>a+(x[k2]||0),0);
       const kc2=Math.round(sm('kcal'));
       cuerpo+='<p class="nota" style="margin:10px 0 4px;display:flex;justify-content:space-between;'+
-        'gap:8px"><span>'+nomC+'</span><span>'+kc2+' kcal · P '+g1(sm('prot'))+
-        ' C '+g1(sm('carb'))+' G '+g1(sm('gras'))+'</span></p>'+
+        'gap:8px"><span>'+nomC+'</span><span>'+kc2+' kcal · G '+g1(sm('gras'))+
+        ' C '+g1(sm('carb'))+' P '+g1(sm('prot'))+'</span></p>'+
         its.map(x=>'<div class="item"><span>'+x.nom+
           '<small>'+x.h+' · '+(x.porc>0?txtPorc(x.porc):Math.round(x.g)+' '+(x.u||'g'))+
-          ' · P '+g1(x.prot)+' C '+g1(x.carb)+' G '+g1(x.gras)+'</small></span>'+
+          ' · G '+g1(x.gras)+' C '+g1(x.carb)+' P '+g1(x.prot)+'</small></span>'+
           '<span class="kc">'+Math.round(x.kcal)+'</span></div>').join('');
     }
     cuerpo+='<div class="sem" style="margin-top:10px"><span>Total</span>'+
@@ -3554,7 +3554,7 @@ function hojaAlim(){
   const el=hoja('Alimentación',
     '<p class="eyebrow">Reparto de macros</p>'+
     '<p class="nota" style="margin:0 0 10px">Porcentaje de tu meta calórica. Define los objetivos de la misión.</p>'+
-    ['prot','carb','gras'].map(k=>'<div class="camp"><label>'+
+    ['gras','carb','prot'].map(k=>'<div class="camp"><label>'+
       ({prot:'Proteína',carb:'Carbohidratos',gras:'Grasas'})[k]+' %</label>'+
       '<input type="number" id="mc-'+k+'" min="0" max="100" value="'+m[k]+'"></div>').join('')+
     '<div class="pbtns" style="margin-bottom:18px"><button class="btn" data-mac>Guardar reparto</button></div>'+
@@ -3581,13 +3581,13 @@ function verAlimento(id,volver){
   const a=D.nutri.alimentos[id]; if(!a)return;
   const u=uni(a), c=por100(a);
   const fila=(t,k,p,cb,g)=>'<div class="sem"><span>'+t+'</span><b style="margin-left:auto">'+
-    Math.round(k)+' kcal · P '+p.toFixed(1)+' · C '+cb.toFixed(1)+' · G '+g.toFixed(1)+'</b></div>';
+    Math.round(k)+' kcal · G '+g.toFixed(1)+' · C '+cb.toFixed(1)+' · P '+p.toFixed(1)+'</b></div>';
   let cuerpo=(a.marca?'<p class="nota" style="margin:0 0 10px">'+a.marca+'</p>':'')+
     fila('100 '+u,c.k,c.p,c.c,c.g);
   if(a.medida){const f=a.medida.g/100;
     cuerpo+=fila('1 '+a.medida.nom+' · '+a.medida.g+' '+u,c.k*f,c.p*f,c.c*f,c.g*f)}
   cuerpo+='<p class="nota" style="margin-top:12px">Etiqueta original: '+a.gramos+' '+u+' = '+
-    a.kcal+' kcal · P '+a.prot+' · C '+a.carb+' · G '+a.gras+'</p>';
+    a.kcal+' kcal · G '+a.gras+' · C '+a.carb+' · P '+a.prot+'</p>';
   hoja(a.nom,cuerpo,null,volver);
 }
 
@@ -3617,16 +3617,16 @@ function verRecetaCongelada(sn,fecha,volver){
     '<p class="eyebrow">Ingredientes</p>';
   for(const x of sn.ing){
     cuerpo+='<div class="item"><span>'+x.nom+
-      '<small>'+x.txt+' · P '+x.p.toFixed(1)+' C '+x.c.toFixed(1)+' G '+x.gr.toFixed(1)+'</small></span>'+
+      '<small>'+x.txt+' · G '+x.gr.toFixed(1)+' C '+x.c.toFixed(1)+' P '+x.p.toFixed(1)+'</small></span>'+
       '<span class="kc">'+Math.round(x.k)+'</span></div>';
   }
   cuerpo+='<p class="eyebrow" style="margin-top:16px">Total</p>'+
     '<div class="sem"><span>Cantidad final</span><b style="margin-left:auto">'+sn.pesoFinal+' '+sn.unidad+
       (sn.porciones>1?'  ·  '+sn.porciones+' porciones':'')+'</b></div>'+
     '<div class="sem"><span>Calorías</span><b style="margin-left:auto">'+Math.round(sn.tot.k)+' kcal</b></div>'+
-    '<div class="sem"><span>Proteína</span><b style="margin-left:auto">'+sn.tot.p.toFixed(1)+' g</b></div>'+
-    '<div class="sem"><span>Carbohidratos</span><b style="margin-left:auto">'+sn.tot.c.toFixed(1)+' g</b></div>'+
     '<div class="sem"><span>Grasas</span><b style="margin-left:auto">'+sn.tot.g.toFixed(1)+' g</b></div>'+
+    '<div class="sem"><span>Carbohidratos</span><b style="margin-left:auto">'+sn.tot.c.toFixed(1)+' g</b></div>'+
+    '<div class="sem"><span>Proteína</span><b style="margin-left:auto">'+sn.tot.p.toFixed(1)+' g</b></div>'+
     '<div class="sem"><span>Por 100 '+sn.unidad+'</span><b style="margin-left:auto">'+
       Math.round(sn.tot.k/pf*100)+' kcal</b></div>'+
     '<p class="eyebrow" style="margin-top:16px">Preparación</p>'+
@@ -3647,16 +3647,16 @@ function verReceta(id,volver){
     if(!o){cuerpo+='<div class="sem"><span>(eliminado)</span></div>';continue}
     const n=nutreDe(ref,ing.g);
     cuerpo+='<div class="item"><span>'+(esR?'':(o.marca?o.marca+' · ':''))+o.nom+(esR?' <small style="color:var(--cian)">· receta</small>':'')+
-      '<small>'+medTxt(ing,o)+' · P '+n.prot.toFixed(1)+' C '+n.carb.toFixed(1)+' G '+n.gras.toFixed(1)+'</small></span>'+
+      '<small>'+medTxt(ing,o)+' · G '+n.gras.toFixed(1)+' C '+n.carb.toFixed(1)+' P '+n.prot.toFixed(1)+'</small></span>'+
       '<span class="kc">'+Math.round(n.kcal)+'</span></div>';
   }
   cuerpo+='<p class="eyebrow" style="margin-top:16px">Total</p>'+
     '<div class="sem"><span>Cantidad final</span><b style="margin-left:auto">'+r.pesoFinal+' '+uni(r)+
       (r.porciones>1?'  ·  '+r.porciones+' porciones':'')+'</b></div>'+
     '<div class="sem"><span>Calorías</span><b style="margin-left:auto">'+Math.round(t.k)+' kcal</b></div>'+
-    '<div class="sem"><span>Proteína</span><b style="margin-left:auto">'+t.p.toFixed(1)+' g</b></div>'+
-    '<div class="sem"><span>Carbohidratos</span><b style="margin-left:auto">'+t.c.toFixed(1)+' g</b></div>'+
     '<div class="sem"><span>Grasas</span><b style="margin-left:auto">'+t.g.toFixed(1)+' g</b></div>'+
+    '<div class="sem"><span>Carbohidratos</span><b style="margin-left:auto">'+t.c.toFixed(1)+' g</b></div>'+
+    '<div class="sem"><span>Proteína</span><b style="margin-left:auto">'+t.p.toFixed(1)+' g</b></div>'+
     '<div class="sem"><span>Por 100 g</span><b style="margin-left:auto">'+Math.round(u100.k*100)+' kcal</b></div>'+
     '<p class="eyebrow" style="margin-top:16px">Preparación</p>'+
     (r.prep?'<p style="font-size:13.5px;line-height:1.6;white-space:pre-wrap;margin:0">'+
@@ -3720,9 +3720,9 @@ function formAlimento(id,volver){
       '<option value="ml"'+(uni(a)==='ml'?' selected':'')+'>Mililitros (líquidos)</option></select></div>'+
     '<div class="camp"><label>Tamaño de la porción</label><input type="number" id="f-g" value="'+a.gramos+'"></div>'+
     '<div class="camp"><label>Calorías de esa porción</label><input type="number" id="f-k" value="'+a.kcal+'"></div>'+
-    '<div class="camp"><label>Proteína g</label><input type="number" id="f-p" step="0.1" value="'+a.prot+'"></div>'+
-    '<div class="camp"><label>Carbohidratos g</label><input type="number" id="f-c" step="0.1" value="'+a.carb+'"></div>'+
     '<div class="camp"><label>Grasas g</label><input type="number" id="f-f" step="0.1" value="'+a.gras+'"></div>'+
+    '<div class="camp"><label>Carbohidratos g</label><input type="number" id="f-c" step="0.1" value="'+a.carb+'"></div>'+
+    '<div class="camp"><label>Proteína g</label><input type="number" id="f-p" step="0.1" value="'+a.prot+'"></div>'+
     '<div id="f-dens" style="display:'+(uni(a)==='ml'?'block':'none')+'">'+
       '<p class="nota" style="margin:12px 0 10px">Solo para líquidos, opcional: cuánto pesan 100 ml. '+
       'Si lo llenas, podrás registrarlo pesándolo en la balanza en vez de medirlo.</p>'+
@@ -3816,7 +3816,7 @@ function formReceta(idArg,volver){
         '<small>'+medTxt(x,o)+'</small></span>'+
         '<button data-q="'+i+'">×</button></div>'}).join(''):'<p class="nota">Sin ingredientes.</p>')+
     '<button class="addbtn" data-ing>+ Añadir ingrediente</button>'+
-    '<p class="nota">Total crudo: '+Math.round(t.k)+' kcal · P '+t.p.toFixed(1)+' · C '+t.c.toFixed(1)+' · G '+t.g.toFixed(1)+'</p>'+
+    '<p class="nota">Total crudo: '+Math.round(t.k)+' kcal · G '+t.g.toFixed(1)+' · C '+t.c.toFixed(1)+' · P '+t.p.toFixed(1)+'</p>'+
     '<div class="camp" style="margin-top:14px"><label>Preparación · opcional</label>'+
     '<textarea id="r-pp" rows="4" style="width:100%;background:rgba(4,10,20,.85);border:1px solid var(--linea);'+
     'color:var(--texto);font-family:inherit;font-size:14px;padding:10px">'+(r.prep||'')+'</textarea></div>'+
@@ -3922,8 +3922,8 @@ function formReceta(idArg,volver){
             const gr=()=>enMed()?cant()*md.g:cant();
             const prev=()=>{const g=gr(), n=nutreDe((esR?'r:':'a:')+xid,g);
               e3.querySelector('#iprev').innerHTML=n?
-                (Math.round(g*10)/10)+' '+u+' · '+Math.round(n.kcal)+' kcal · P '+n.prot.toFixed(1)+
-                ' · C '+n.carb.toFixed(1)+' · G '+n.gras.toFixed(1):''};
+                (Math.round(g*10)/10)+' '+u+' · '+Math.round(n.kcal)+' kcal · G '+n.gras.toFixed(1)+
+                ' · C '+n.carb.toFixed(1)+' · P '+n.prot.toFixed(1):''};
             e3.querySelector('#ig').addEventListener('input',prev);
             if(md)e3.querySelector('#imq').addEventListener('change',()=>{
               e3.querySelector('#ilq').textContent='Cantidad en '+nomU(e3.querySelector('#imq').value);
