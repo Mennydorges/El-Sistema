@@ -625,7 +625,7 @@ const ATRIBUTOS={
   RES:{base:{vac:24,ciclo:16},techo:{vac:80,ciclo:44},inc:4},
   DES:{base:{vac:8,ciclo:6},techo:{vac:24,ciclo:16},inc:2},
   CON:{base:{vac:44,ciclo:44},techo:{vac:60,ciclo:60},inc:3},
-  DIS:{base:{vac:60,ciclo:55},techo:{vac:85,ciclo:85},inc:5},
+  DIS:{base:{vac:45,ciclo:40},techo:{vac:60,ciclo:60},inc:4},
   INT:{base:{vac:36,ciclo:20},techo:{vac:56,ciclo:56},inc:3}
 };
 const CLAVES=Object.keys(ATRIBUTOS);
@@ -1016,7 +1016,7 @@ function misionesPendientesHoy(){
 
 const CFG={costoNivel2:350,gMin:.03,gMax:.18,nivelCongela:40,crecMision:.10,
   esquirlasPorPunto:5,puntosPorBloque:4,excedentesConXP:3,factorExcedente:.40,
-  rachaMin:{vac:4,ciclo:3},bonusAtonement:15,topeINTturno:6,diasBloque:28,
+  rachaMin:{vac:4,ciclo:3},bonusAtonement:15,topeINTturno:6,diasBloque:28,disPorSemanal:15,
   triageSeguidos:3,triageSemana:3,triageBloque:10,criticalDias:10,criticalAnio:2,atonementSemana:2,
   leaveAnio:28};
 const RANGOS=[[150,"S"],[114,"A"],[65,"B"],[41,"C"],[16,"D"],[1,"E"]];
@@ -1402,7 +1402,8 @@ function calcular(hasta){
       else if(S.pares)ok=vivas.every(id=>sumaSem(semKey,id)>=cuota);
       else ok=vivas.reduce((a,id)=>a+sumaSem(semKey,id),0)>=cuota;
       const bono=(deuda&&!trCancela)?CFG.bonusAtonement:0;
-      if(ok){addXP(Math.round((S.xp+bono)*mult),semKey);res.misiones.push({id:sid,ok:true,xp:Math.round((S.xp+bono)*mult)})}
+      if(ok){addXP(Math.round((S.xp+bono)*mult),semKey);res.misiones.push({id:sid,ok:true,xp:Math.round((S.xp+bono)*mult)});
+        if(contB.DIS!=null)contB.DIS+=CFG.disPorSemanal;}
       else if(!hayCrit&&!S.opcionalSem){addXP(-Math.round((S.fallo+bono)*mult),semKey);res.misiones.push({id:sid,ok:false,xp:-Math.round((S.fallo+bono)*mult)})}
       const refPerf=S.mide?S.mide[0]:vivas[0];
       if(S.perfecta&&refPerf&&sumaSem(semKey,refPerf)>=S.perfecta&&!hayCrit){
